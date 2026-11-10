@@ -1,456 +1,739 @@
-import os
-import json
-import random
-import hashlib
-import secrets
-import logging
-from pathlib import Path
 
-from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
-
-load_dotenv(override=True)
-
-TOKEN = os.environ.get("BOT_TOKEN")
-WALLET_ADDRESS = "46d690b623b41d959bd438568e5cd913"
-
-if not TOKEN:
-    raise RuntimeError("BOT_TOKEN غير مضبوط في ملف .env")
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-DB = Path("players.json")
-DEPOSITS = Path("deposit_requests.json")
-
-players = {}
-
-
-def load():
-    global players
-
-    if DB.exists():
-        try:
-            players = json.loads(DB.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            logger.exception("خطأ في قراءة players.json")
-            players = {}
-    else:
-        players = {}
-
-
-def save():
-    DB.write_text(
-        json.dumps(players, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
-
-
-def account(uid):
-    uid = str(uid)
-
-    if uid not in players:
-        players[uid] = {
-            "points": 100,
-            "username": None,
-            "password": None,
-            "wallet": None
-        }
-        save()
-
-    return players[uid]
-
-
-def menu():
-    buttons = [
-        [InlineKeyboardButton("👤 إنشاء حساب", callback_data="register")],
-        [InlineKeyboardButton("💳 شحن حساب", callback_data="deposit")],
-        [InlineKeyboardButton("💸 سحب من الحساب", callback_data="withdraw")],
-        [InlineKeyboardButton("🌐 موقع الألعاب", callback_data="website")],
-        [InlineKeyboardButton("💰 رصيدي", callback_data="balance")],
-        [InlineKeyboardButton("🎮 الألعاب", callback_data="games")]
-    ]
-
-    return InlineKeyboardMarkup(buttons)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    p = account(update.effective_user.id)
-
-    context.user_data.pop("action", None)
-
-    await update.message.reply_text(
-        f"🦁 أهلاً بك في LION GAMES\n"
-        f"رصيدك التجريبي: {p['points']} نقطة\n"
-        "اختر الخدمة:",
-        reply_markup=menu()
-    )
-
-
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    uid = str(q.from_user.id)
-    p = account(uid)
-    choice = q.data
-
-    if choice == "register":
-        if p["username"]:
-            await q.message.reply_text("لديك حساب مسجل بالفعل.")
-        else:
-            context.user_data["action"] = "register_username"
-            await q.message.reply_text(
-                "أرسل اسم المستخدم الذي تريد تسجيله:"
-            )
-
-    elif choice == "deposit":
-        context.user_data.pop("action", None)
-
-        await q.message.reply_text(
-            "💳 اختر طريقة شحن حسابك:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("💚 شام كاش", callback_data="deposit_sham")],
-                [InlineKeyboardButton("📱 سيرياتيل كاش", callback_data="deposit_syriatel")],
-                [InlineKeyboardButton("₮ USDT", callback_data="deposit_usdt")],
-                [InlineKeyboardButton("⬅️ رجوع", callback_data="menu")]
-            ])
-        )
-
-    elif choice == "deposit_sham":
-        context.user_data["payment_method"] = "شام كاش"
-        context.user_data["action"] = "deposit_amount"
-
-        await q.message.reply_text(
-            f"💚 شام كاش\n"
-            f"عنوان الاستقبال:\n{WALLET_ADDRESS}\n\n"
-            "أرسل مبلغ الشحن:"
-        )
-
-    elif choice == "deposit_syriatel":
-        context.user_data["payment_method"] = "سيرياتيل كاش"
-        context.user_data["action"] = "deposit_amount"
-
-        await q.message.reply_text(
-            "📱 سيرياتيل كاش\n"
-            "رقم التحويل: 85370602\n\n"
-            "أرسل مبلغ الشحن:"
-        )
-
-    elif choice == "deposit_usdt":
-        context.user_data["payment_method"] = "USDT"
-        context.user_data["action"] = "deposit_amount"
-
-        await q.message.reply_text(
-            "₮ الدفع عبر USDT\n"
-            "الشبكة: BEP20 (BNB Smart Chain)\n"
-            "عنوان الاستقبال:\n"
-            "0x172ae5bCaEcbFe258b70b41EC372bB2f8E04C761\n\n"
-            "أرسل مبلغ الشحن:"
-        )
-
-    elif choice == "withdraw":
-        context.user_data["action"] = "withdraw"
-
-        await q.message.reply_text(
-            "💸 أرسل مقدار الرصيد التجريبي الذي تريد سحبه:"
-        )
-
-    elif choice == "website":
-        await q.message.reply_text(
-            "🌐 رابط موقع الألعاب:\nhttps://eaglebet99.com/"
-        )
-
-    elif choice == "balance":
-        await q.message.reply_text(
-            f"💰 رصيدك الحالي: {p['points']} نقطة تجريبية"
-        )
-
-    elif choice == "games":
-        context.user_data.pop("action", None)
-
-        await q.message.reply_text(
-            "🎮 اختر لعبة:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🎰 Slots", callback_data="slots")],
-                [InlineKeyboardButton("🎡 Roulette", callback_data="roulette")],
-                [InlineKeyboardButton("💣 Mines", callback_data="mines")],
-                [InlineKeyboardButton("🚀 Crash", callback_data="crash")],
-                [InlineKeyboardButton("⬅️ القائمة", callback_data="menu")]
-            ])
-        )
-
-    elif choice == "menu":
-        context.user_data.pop("action", None)
-
-        await q.message.reply_text(
-            "القائمة الرئيسية:",
-            reply_markup=menu()
-        )
-
-    elif choice == "slots":
-        symbols = ["🍒", "🍋", "🍇", "⭐", "7️⃣"]
-        result = [random.choice(symbols) for _ in range(3)]
-
-        prize = (
-            100 if result[0] == result[1] == result[2]
-            else 20 if len(set(result)) == 2
-            else 0
-        )
-
-        p["points"] += prize
-        save()
-
-        await q.message.reply_text(
-            f"🎰 {' '.join(result)}\n"
-            f"ربحت {prize} نقطة\n"
-            f"رصيدك: {p['points']}",
-            reply_markup=menu()
-        )
-
-    elif choice == "roulette":
-        number = random.randint(0, 36)
-
-        await q.message.reply_text(
-            f"🎡 الرقم: {number}\n"
-            f"رصيدك: {p['points']}",
-            reply_markup=menu()
-        )
-
-    elif choice == "crash":
-        multiplier = round(random.uniform(1, 5), 2)
-
-        await q.message.reply_text(
-            f"🚀 انتهت الجولة عند {multiplier}x",
-            reply_markup=menu()
-        )
-
-    elif choice == "mines":
-        await q.message.reply_text(
-            "💣 لعبة الألغام قيد التطوير.",
-            reply_markup=menu()
-        )
-
-
-def read_deposits():
-    if not DEPOSITS.exists():
-        return []
-
-    try:
-        return json.loads(DEPOSITS.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        logger.exception("خطأ في قراءة طلبات الشحن")
-        return []
-
-
-def save_deposits(requests):
-    DEPOSITS.write_text(
-        json.dumps(requests, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
-
-
-async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    action = context.user_data.get("action")
-
-    if not action or not update.message or not update.message.text:
-        return
-
-    uid = str(update.effective_user.id)
-    p = account(uid)
-    value = update.message.text.strip()
-
-    if action == "register_username":
-
-        if (
-            len(value) < 3
-            or len(value) > 20
-            or not value.replace("_", "").isalnum()
-        ):
-            await update.message.reply_text(
-                "اسم المستخدم يجب أن يكون 3 إلى 20 حرفاً أو رقماً."
-            )
-            return
-
-        if any(
-            x.get("username") == value
-            for x in players.values()
-        ):
-            await update.message.reply_text(
-                "اسم المستخدم مستخدم. اختر اسماً آخر."
-            )
-            return
-
-        context.user_data["new_username"] = value
-        context.user_data["action"] = "register_password"
-
-        await update.message.reply_text(
-            "أرسل كلمة مرور لحسابك (8 أحرف على الأقل):"
-        )
-
-    elif action == "register_password":
-
-        if len(value) < 8:
-            await update.message.reply_text(
-                "كلمة المرور قصيرة. أرسل 8 أحرف على الأقل."
-            )
-            return
-
-        salt = secrets.token_hex(16)
-
-        digest = hashlib.pbkdf2_hmac(
-            "sha256",
-            value.encode(),
-            salt.encode(),
-            200000
-        ).hex()
-
-        p["username"] = context.user_data.pop("new_username")
-        p["password"] = salt + ":" + digest
-
-        save()
-
-        context.user_data.pop("action", None)
-
-        await update.message.reply_text(
-            "✅ تم إنشاء حسابك بنجاح!",
-            reply_markup=menu()
-        )
-
-    elif action == "deposit_amount":
-
-        try:
-            amount = int(value)
-
-            if amount <= 0:
-                raise ValueError
-
-        except ValueError:
-            await update.message.reply_text(
-                "أرسل مبلغاً صحيحاً."
-            )
-            return
-
-        context.user_data["deposit_amount"] = amount
-        context.user_data["action"] = "deposit_reference"
-
-        await update.message.reply_text(
-            "أرسل رقم العملية الآن:"
-        )
-
-    elif action == "deposit_reference":
-
-        reference = value
-
-        if len(reference) < 3 or len(reference) > 80:
-            await update.message.reply_text(
-                "رقم العملية غير صحيح. أعد إرساله."
-            )
-            return
-
-        requests = read_deposits()
-
-        method = context.user_data.get(
-            "payment_method",
-            "unknown"
-        )
-
-        duplicate = any(
-            r.get("reference") == reference
-            and r.get("payment_method") == method
-            for r in requests
-        )
-
-        if duplicate:
-            await update.message.reply_text(
-                "⚠️ رقم العملية مسجل مسبقاً. تحقق منه وأرسل الرقم الصحيح."
-            )
-            return
-
-        amount = context.user_data.pop("deposit_amount")
-
-        requests.append({
-            "user_id": uid,
-            "amount": amount,
-            "payment_method": method,
-            "reference": reference,
-            "status": "pending"
-        })
-
-        save_deposits(requests)
-
-        context.user_data.pop("action", None)
-        context.user_data.pop("payment_method", None)
-
-        await update.message.reply_text(
-            f"✅ تم استلام طلب الشحن.\n"
-            f"طريقة الدفع: {method}\n"
-            f"المبلغ: {amount}\n"
-            f"رقم العملية: {reference}\n"
-            "الحالة: قيد المراجعة.\n\n"
-            "لن يضاف الرصيد قبل التحقق من العملية.",
-            reply_markup=menu()
-        )
-
-    elif action == "withdraw":
-
-        try:
-            amount = int(value)
-
-            if amount <= 0:
-                raise ValueError
-
-        except ValueError:
-            await update.message.reply_text(
-                "أرسل مبلغاً صحيحاً."
-            )
-            return
-
-        if amount > p["points"]:
-            await update.message.reply_text(
-                "رصيدك لا يكفي."
-            )
-            return
-
-        p["points"] -= amount
-        save()
-
-        context.user_data.pop("action", None)
-
-        await update.message.reply_text(
-            f"تم تحديث رصيدك التجريبي.\n"
-            f"رصيدك: {p['points']}",
-            reply_markup=menu()
-        )
-
-
-def main():
-    load()
-
-    app = Application.builder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(buttons))
-
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            messages
-        )
-    )
-
-    print("LION GAMES BOT IS RUNNING")
-
-    app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
+const { Bot, Keyboard, InlineKeyboard } = require("grammy");
+const fs = require("fs");
+const path = require("path");
+
+// ================= CONFIG =================
+
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const ADMIN_ID = String(process.env.ADMIN_TELEGRAM_ID || "");
+
+const WEBSITE_URL = process.env.WEBSITE_URL || "https://eaglebet99.com/";
+
+const PAYMENTS = {
+  sham_syp: process.env.SHAM_SYP_ADDRESS || "",
+  sham_usd: process.env.SHAM_USD_ADDRESS || "",
+  syriatel: process.env.SYRIATEL_ADDRESS || "",
+  usdt: process.env.USDT_BEP20_ADDRESS || ""
+};
+
+if (!TOKEN || !ADMIN_ID) {
+  console.error("Missing TELEGRAM_BOT_TOKEN or ADMIN_TELEGRAM_ID");
+  process.exit(1);
+}
+
+const bot = new Bot(TOKEN);
+
+// ================= DATABASE =================
+
+const DB_FILE = path.join(__dirname, "lion_database.json");
+
+let db = {
+  players: {},
+  deposits: {},
+  withdrawals: {},
+  counters: { deposit: 1000, withdrawal: 2000 },
+  support: {}
+};
+
+if (fs.existsSync(DB_FILE)) {
+  try {
+    db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, "utf8")) };
+  } catch (e) {
+    console.error("Database loading error:", e.message);
+  }
+}
+
+function saveDB() {
+  const temp = DB_FILE + ".tmp";
+  fs.writeFileSync(temp, JSON.stringify(db, null, 2));
+  fs.renameSync(temp, DB_FILE);
+}
+
+const sessions = new Map();
+
+const METHODS = {
+  sham_syp: {
+    name: "شام كاش - ليرة سورية",
+    currency: "SYP",
+    address: PAYMENTS.sham_syp
+  },
+  sham_usd: {
+    name: "شام كاش - دولار",
+    currency: "USD",
+    address: PAYMENTS.sham_usd
+  },
+  syriatel: {
+    name: "سيرياتيل كاش",
+    currency: "SYP",
+    address: PAYMENTS.syriatel
+  },
+  usdt: {
+    name: "USDT - BEP20",
+    currency: "USD",
+    address: PAYMENTS.usdt
+  }
+};
+
+// ================= KEYBOARDS =================
+
+function mainKeyboard() {
+  return new Keyboard()
+    .text("👤 إنشاء حساب").text("💳 شحن المحفظة").row()
+    .text("💸 سحب الرصيد").text("💰 رصيدي").row()
+    .text("🌐 موقع الألعاب").text("📞 مراسلة الدعم")
+    .resized();
+}
+
+function paymentKeyboard() {
+  return new Keyboard()
+    .text("شام كاش - ليرة").text("شام كاش - دولار").row()
+    .text("سيرياتيل كاش").text("USDT - BEP20").row()
+    .text("🏠 القائمة الرئيسية")
+    .resized();
+}
+
+function walletKeyboard() {
+  return new Keyboard()
+    .text("الليرة السورية").text("الدولار").row()
+    .text("🏠 القائمة الرئيسية")
+    .resized();
+}
+
+function cancelKeyboard() {
+  return new Keyboard()
+    .text("إلغاء")
+    .resized();
+}
+
+function getPlayer(id) {
+  return db.players[String(id)];
+}
+
+function getAccountId(id) {
+  return getPlayer(id)?.accountId || "غير مسجل";
+}
+
+function money(amount, currency) {
+  return currency === "SYP"
+    ? `${amount.toLocaleString("en-US")} ل.س`
+    : `${amount.toFixed(2)} $`;
+}
+
+function isAdmin(ctx) {
+  return String(ctx.from?.id) === ADMIN_ID;
+}
+
+async function notifyAdmin(text, keyboard) {
+  return bot.api.sendMessage(
+    Number(ADMIN_ID),
+    text,
+    { reply_markup: keyboard }
+  );
+}
+
+// ================= START =================
+
+bot.command("start", async (ctx) => {
+  sessions.delete(ctx.from.id);
+
+  await ctx.reply(
+    "🦁 أهلاً بك في LION GAMES\n\nمرحباً بك في نظام الحسابات والمحافظ.\nاختر الخدمة التي تريدها من القائمة:",
+    { reply_markup: mainKeyboard() }
+  );
+});
+
+bot.command("id", async (ctx) => {
+  await ctx.reply(`Telegram ID الخاص بك:\n${ctx.from.id}`);
+});
+
+// ================= CREATE ACCOUNT =================
+
+bot.hears("👤 إنشاء حساب", async (ctx) => {
+  const id = String(ctx.from.id);
+
+  if (db.players[id]) {
+    return ctx.reply(
+      `لديك حساب مسجل مسبقاً.\nرقم حسابك: ${db.players[id].accountId}`,
+      { reply_markup: mainKeyboard() }
+    );
+  }
+
+  sessions.set(ctx.from.id, { step: "register" });
+
+  await ctx.reply(
+    "أرسل اسم المستخدم الذي تريد تسجيله:",
+    { reply_markup: cancelKeyboard() }
+  );
+});
+
+// ================= BALANCE =================
+
+bot.hears("💰 رصيدي", async (ctx) => {
+  const player = getPlayer(ctx.from.id);
+
+  if (!player) {
+    return ctx.reply("يجب إنشاء حساب أولاً.");
+  }
+
+  await ctx.reply(
+    `🦁 LION GAMES - رصيدي\n\n` +
+    `رقم الحساب: ${player.accountId}\n\n` +
+    `💵 رصيد الليرة السورية:\n${money(player.syp, "SYP")}\n\n` +
+    `💲 رصيد الدولار:\n${money(player.usd, "USD")}`,
+    { reply_markup: mainKeyboard() }
+  );
+});
+
+// ================= DEPOSIT =================
+
+bot.hears("💳 شحن المحفظة", async (ctx) => {
+  if (!getPlayer(ctx.from.id)) {
+    return ctx.reply("أنشئ حساباً أولاً حتى تستطيع الشحن.");
+  }
+
+  await ctx.reply(
+    "💳 اختر طريقة الشحن:",
+    { reply_markup: paymentKeyboard() }
+  );
+});
+
+bot.hears(
+  ["شام كاش - ليرة", "شام كاش - دولار", "سيرياتيل كاش", "USDT - BEP20"],
+  async (ctx) => {
+    const choices = {
+      "شام كاش - ليرة": "sham_syp",
+      "شام كاش - دولار": "sham_usd",
+      "سيرياتيل كاش": "syriatel",
+      "USDT - BEP20": "usdt"
+    };
+
+    const method = METHODS[choices[ctx.message.text]];
+
+    if (!getPlayer(ctx.from.id)) {
+      return ctx.reply("أنشئ حساباً أولاً.");
+    }
+
+    if (!method.address) {
+      return ctx.reply(
+        "طريقة الشحن غير مهيأة حالياً. يرجى مراجعة الدعم."
+      );
+    }
+
+    sessions.set(ctx.from.id, {
+      step: "deposit_amount",
+      method: choices[ctx.message.text]
+    });
+
+    await ctx.reply(
+      `طريقة الشحن: ${method.name}\n\n` +
+      `عنوان التحويل:\n${method.address}\n\n` +
+      `أرسل المبلغ الذي تريد شحنه.\n` +
+      `العملة: ${method.currency}\n\n` +
+      `لا توجد عمولة على الشحن.`,
+      { reply_markup: cancelKeyboard() }
+    );
+  }
+);
+
+// ================= WITHDRAW =================
+
+bot.hears("💸 سحب الرصيد", async (ctx) => {
+  if (!getPlayer(ctx.from.id)) {
+    return ctx.reply("أنشئ حساباً أولاً.");
+  }
+
+  await ctx.reply(
+    "💸 اختر المحفظة التي تريد السحب منها:",
+    { reply_markup: walletKeyboard() }
+  );
+});
+
+bot.hears(["الليرة السورية", "الدولار"], async (ctx) => {
+  const currency = ctx.message.text === "الليرة السورية"
+    ? "SYP"
+    : "USD";
+
+  sessions.set(ctx.from.id, {
+    step: "withdraw_amount",
+    currency
+  });
+
+  await ctx.reply(
+    `أرسل مبلغ السحب بعملة ${currency === "SYP" ? "الليرة السورية" : "الدولار"}.\n\n` +
+    `عمولة السحب 10% فقط.\n` +
+    `سيظهر لك المبلغ الصافي قبل إرسال الطلب.`,
+    { reply_markup: cancelKeyboard() }
+  );
+});
+
+// ================= SUPPORT =================
+
+bot.hears("📞 مراسلة الدعم", async (ctx) => {
+  sessions.set(ctx.from.id, { step: "support" });
+
+  await ctx.reply(
+    "📞 مرحباً بك في دعم LION GAMES.\n\nاكتب رسالتك وسنقوم بإيصالها للإدارة.",
+    { reply_markup: cancelKeyboard() }
+  );
+});
+
+// ================= WEBSITE =================
+
+bot.hears("🌐 موقع الألعاب", async (ctx) => {
+  await ctx.reply(
+    `🌐 موقع LION GAMES:\n${WEBSITE_URL}`,
+    { reply_markup: mainKeyboard() }
+  );
+});
+
+// ================= CANCEL =================
+
+bot.hears("إلغاء", async (ctx) => {
+  sessions.delete(ctx.from.id);
+  await ctx.reply("تم إلغاء العملية.", {
+    reply_markup: mainKeyboard()
+  });
+});
+
+bot.hears("🏠 القائمة الرئيسية", async (ctx) => {
+  sessions.delete(ctx.from.id);
+  await ctx.reply("القائمة الرئيسية:", {
+    reply_markup: mainKeyboard()
+  });
+});
+
+// ================= USER MESSAGES =================
+
+bot.on("message:text", async (ctx) => {
+  const id = String(ctx.from.id);
+  const session = sessions.get(ctx.from.id);
+  const player = getPlayer(id);
+  const value = ctx.message.text.trim();
+
+  if (!session || value.startsWith("/")) return;
+
+  // Registration
+  if (session.step === "register") {
+    if (db.players[id]) {
+      sessions.delete(ctx.from.id);
+      return ctx.reply("لديك حساب مسجل مسبقاً.");
+    }
+
+    if (value.length < 3 || value.length > 30) {
+      return ctx.reply("اسم المستخدم يجب أن يكون بين 3 و30 حرفاً.");
+    }
+
+    const accountId = "LION-" + Math.floor(100000 + Math.random() * 900000);
+
+    db.players[id] = {
+      telegramId: id,
+      accountId,
+      username: value,
+      syp: 0,
+      usd: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    saveDB();
+    sessions.delete(ctx.from.id);
+
+    await ctx.reply(
+      `🎉 تم إنشاء حسابك بنجاح!\n\nرقم حسابك: ${accountId}\nاسم المستخدم: ${value}`,
+      { reply_markup: mainKeyboard() }
+    );
+
+    await notifyAdmin(
+      `👤 حساب جديد\n\nالاسم: ${value}\nالحساب: ${accountId}\nTelegram ID: ${id}`
+    );
+
+    return;
+  }
+
+  if (!player) {
+    return ctx.reply("يرجى إنشاء حساب أولاً.");
+  }
+
+  // Deposit amount
+  if (session.step === "deposit_amount") {
+    const amount = Number(value);
+
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000000000) {
+      return ctx.reply("أرسل مبلغاً صحيحاً.");
+    }
+
+    session.amount = amount;
+    session.step = "deposit_proof";
+
+    const method = METHODS[session.method];
+
+    await ctx.reply(
+      `المبلغ: ${money(amount, method.currency)}\n\nأرسل صورة الإيصال أو رقم العملية الآن.`,
+      { reply_markup: cancelKeyboard() }
+    );
+    return;
+  }
+
+  // Deposit proof
+  if (session.step === "deposit_proof") {
+    await createDeposit(ctx, session, value);
+    return;
+  }
+
+  // Withdrawal amount
+  if (session.step === "withdraw_amount") {
+    const amount = Number(value);
+    const balance = session.currency === "SYP" ? player.syp : player.usd;
+
+    if (!Number.isFinite(amount) || amount <= 0 || amount > balance) {
+      return ctx.reply(
+        `المبلغ غير صحيح أو رصيدك غير كافٍ.\nرصيدك: ${money(balance, session.currency)}`
+      );
+    }
+
+    const fee = amount * 0.10;
+    const net = amount - fee;
+
+    session.amount = amount;
+    session.fee = fee;
+    session.net = net;
+    session.step = "withdraw_address";
+
+    await ctx.reply(
+      `📋 تفاصيل طلب السحب:\n\n` +
+      `المبلغ: ${money(amount, session.currency)}\n` +
+      `العمولة 10%: ${money(fee, session.currency)}\n` +
+      `المبلغ الذي ستستلمه: ${money(net, session.currency)}\n\n` +
+      `أرسل رقم حسابك أو عنوان الاستلام الآن.`,
+      { reply_markup: cancelKeyboard() }
+    );
+    return;
+  }
+
+  // Withdrawal address
+  if (session.step === "withdraw_address") {
+    await createWithdrawal(ctx, session, value);
+    return;
+  }
+
+  // Support
+  if (session.step === "support") {
+    sessions.delete(ctx.from.id);
+
+    const supportId = "SUP-" + Date.now();
+
+    await ctx.reply(
+      "✅ تم إرسال رسالتك إلى الدعم. سنرد عليك قريباً.",
+      { reply_markup: mainKeyboard() }
+    );
+
+    await notifyAdmin(
+      `📩 رسالة دعم جديدة\n\n` +
+      `رقم الرسالة: ${supportId}\n` +
+      `اللاعب: ${player.username}\n` +
+      `رقم الحساب: ${player.accountId}\n` +
+      `Telegram ID: ${id}\n\n` +
+      `الرسالة:\n${value}\n\n` +
+      `للرد: اضغط Reply على هذه الرسالة واكتب ردك.`
+    );
+  }
+});
+
+// ================= DEPOSIT CREATION =================
+
+async function createDeposit(ctx, session, proof) {
+  const id = String(ctx.from.id);
+  const player = getPlayer(id);
+  const method = METHODS[session.method];
+
+  const requestId = "DEP-" + (++db.counters.deposit);
+
+  db.deposits[requestId] = {
+    id: requestId,
+    telegramId: id,
+    accountId: player.accountId,
+    amount: session.amount,
+    currency: method.currency,
+    method: method.name,
+    proof,
+    status: "pending",
+    createdAt: new Date().toISOString()
+  };
+
+  saveDB();
+  sessions.delete(ctx.from.id);
+
+  const keyboard = new InlineKeyboard()
+    .text("✅ قبول الشحن", `dep_ok:${requestId}`)
+    .text("❌ رفض الشحن", `dep_no:${requestId}`);
+
+  await ctx.reply(
+    `تم استلام طلب الشحن.\n\nرقم الطلب: ${requestId}\n` +
+    `المبلغ: ${money(session.amount, method.currency)}\n` +
+    `الحالة: قيد المراجعة.\n\n` +
+    `سيتم إضافة الرصيد بعد التحقق من وصول الحوالة.`,
+    { reply_markup: mainKeyboard() }
+  );
+
+  await notifyAdmin(
+    `💳 طلب شحن جديد\n\n` +
+    `رقم الطلب: ${requestId}\n` +
+    `اللاعب: ${player.username}\n` +
+    `الحساب: ${player.accountId}\n` +
+    `Telegram ID: ${id}\n` +
+    `الطريقة: ${method.name}\n` +
+    `المبلغ: ${money(session.amount, method.currency)}\n` +
+    `الإثبات: ${proof}`,
+    keyboard
+  );
+}
+
+// ================= WITHDRAWAL CREATION =================
+
+async function createWithdrawal(ctx, session, address) {
+  const id = String(ctx.from.id);
+  const player = getPlayer(id);
+
+  const amount = session.amount;
+  const fee = session.fee;
+  const net = session.net;
+  const currency = session.currency;
+
+  const balanceKey = currency === "SYP" ? "syp" : "usd";
+
+  if (player[balanceKey] < amount) {
+    sessions.delete(ctx.from.id);
+    return ctx.reply("رصيدك لم يعد كافياً لهذا الطلب.");
+  }
+
+  const requestId = "WDR-" + (++db.counters.withdrawal);
+
+  // Reserve the complete requested amount.
+  player[balanceKey] -= amount;
+
+  db.withdrawals[requestId] = {
+    id: requestId,
+    telegramId: id,
+    accountId: player.accountId,
+    amount,
+    fee,
+    net,
+    currency,
+    address,
+    status: "pending",
+    createdAt: new Date().toISOString()
+  };
+
+  saveDB();
+  sessions.delete(ctx.from.id);
+
+  const keyboard = new InlineKeyboard()
+    .text("✅ تم التحويل", `wd_ok:${requestId}`)
+    .text("❌ رفض وإعادة الرصيد", `wd_no:${requestId}`);
+
+  await ctx.reply(
+    `📋 تم استلام طلب السحب.\n\n` +
+    `رقم الطلب: ${requestId}\n` +
+    `المبلغ المطلوب: ${money(amount, currency)}\n` +
+    `العمولة 10%: ${money(fee, currency)}\n` +
+    `المبلغ الصافي: ${money(net, currency)}\n\n` +
+    `الحالة: قيد المراجعة.\nسيتم إشعارك عند تنفيذ الطلب.`,
+    { reply_markup: mainKeyboard() }
+  );
+
+  await notifyAdmin(
+    `💸 طلب سحب جديد\n\n` +
+    `رقم الطلب: ${requestId}\n` +
+    `اللاعب: ${player.username}\n` +
+    `الحساب: ${player.accountId}\n` +
+    `Telegram ID: ${id}\n` +
+    `المبلغ: ${money(amount, currency)}\n` +
+    `العمولة: ${money(fee, currency)}\n` +
+    `الصافي: ${money(net, currency)}\n` +
+    `عنوان الاستلام: ${address}`,
+    keyboard
+  );
+}
+
+// ================= ADMIN CALLBACKS =================
+
+bot.callbackQuery(/^dep_ok:(.+)$/, async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery("غير مصرح.");
+
+  const request = db.deposits[ctx.match[1]];
+
+  if (!request || request.status !== "pending") {
+    return ctx.answerCallbackQuery("الطلب غير متاح أو تمت معالجته.");
+  }
+
+  const player = getPlayer(request.telegramId);
+
+  if (!player) return ctx.answerCallbackQuery("اللاعب غير موجود.");
+
+  const key = request.currency === "SYP" ? "syp" : "usd";
+
+  player[key] += request.amount;
+  request.status = "approved";
+  request.processedAt = new Date().toISOString();
+
+  saveDB();
+
+  await bot.api.sendMessage(
+    Number(request.telegramId),
+    `✅ تم تأكيد الشحن بنجاح!\n\n` +
+    `رقم الطلب: ${request.id}\n` +
+    `المبلغ المضاف: ${money(request.amount, request.currency)}`
+  );
+
+  await ctx.editMessageText(
+    `✅ تمت الموافقة على طلب الشحن ${request.id}\nتمت إضافة الرصيد.`
+  );
+
+  await ctx.answerCallbackQuery("تم قبول الشحن.");
+});
+
+bot.callbackQuery(/^dep_no:(.+)$/, async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery("غير مصرح.");
+
+  const request = db.deposits[ctx.match[1]];
+
+  if (!request || request.status !== "pending") {
+    return ctx.answerCallbackQuery("الطلب غير متاح.");
+  }
+
+  request.status = "rejected";
+  saveDB();
+
+  await bot.api.sendMessage(
+    Number(request.telegramId),
+    `❌ تم رفض طلب الشحن.\nرقم الطلب: ${request.id}\nيرجى التواصل مع الدعم.`
+  );
+
+  await ctx.editMessageText(`❌ تم رفض طلب الشحن ${request.id}`);
+  await ctx.answerCallbackQuery("تم رفض الطلب.");
+});
+
+bot.callbackQuery(/^wd_ok:(.+)$/, async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery("غير مصرح.");
+
+  const request = db.withdrawals[ctx.match[1]];
+
+  if (!request || request.status !== "pending") {
+    return ctx.answerCallbackQuery("الطلب غير متاح.");
+  }
+
+  request.status = "paid";
+  request.processedAt = new Date().toISOString();
+
+  saveDB();
+
+  await bot.api.sendMessage(
+    Number(request.telegramId),
+    `✅ تم تحويل المبلغ بنجاح!\n\n` +
+    `رقم الطلب: ${request.id}\n` +
+    `المبلغ الأصلي: ${money(request.amount, request.currency)}\n` +
+    `عمولة السحب 10%: ${money(request.fee, request.currency)}\n` +
+    `المبلغ المحول إليك: ${money(request.net, request.currency)}`
+  );
+
+  await ctx.editMessageText(`✅ تم تأكيد تحويل طلب السحب ${request.id}`);
+  await ctx.answerCallbackQuery("تم تأكيد التحويل.");
+});
+
+bot.callbackQuery(/^wd_no:(.+)$/, async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.answerCallbackQuery("غير مصرح.");
+
+  const request = db.withdrawals[ctx.match[1]];
+
+  if (!request || request.status !== "pending") {
+    return ctx.answerCallbackQuery("الطلب غير متاح.");
+  }
+
+  const player = getPlayer(request.telegramId);
+
+  if (player) {
+    const key = request.currency === "SYP" ? "syp" : "usd";
+    player[key] += request.amount;
+  }
+
+  request.status = "rejected";
+  request.processedAt = new Date().toISOString();
+
+  saveDB();
+
+  await bot.api.sendMessage(
+    Number(request.telegramId),
+    `❌ تم رفض طلب السحب.\nرقم الطلب: ${request.id}\nتمت إعادة المبلغ إلى رصيدك.`
+  );
+
+  await ctx.editMessageText(
+    `❌ تم رفض طلب السحب ${request.id} وإعادة الرصيد.`
+  );
+
+  await ctx.answerCallbackQuery("تم رفض السحب وإعادة الرصيد.");
+});
+
+// ================= SUPPORT REPLIES =================
+
+// Admin replies directly to the notification message.
+bot.on("message:text", async (ctx, next) => {
+  if (!isAdmin(ctx)) return next();
+
+  const reply = ctx.message.reply_to_message;
+  if (!reply) return next();
+
+  const match = reply.text?.match(/Telegram ID: (\d+)/);
+
+  if (!match) return next();
+
+  const userId = match[1];
+
+  try {
+    await bot.api.sendMessage(
+      Number(userId),
+      `📩 رد من دعم LION GAMES:\n\n${ctx.message.text}`
+    );
+
+    await ctx.reply("✅ تم إرسال الرد للاعب.");
+  } catch (e) {
+    await ctx.reply("تعذر إرسال الرد. تأكد أن اللاعب بدأ البوت.");
+  }
+});
+
+// ================= ADMIN COMMAND =================
+
+bot.command("admin", async (ctx) => {
+  if (!isAdmin(ctx)) return;
+
+  const players = Object.keys(db.players).length;
+
+  const deposits = Object.values(db.deposits)
+    .filter(x => x.status === "pending").length;
+
+  const withdrawals = Object.values(db.withdrawals)
+    .filter(x => x.status === "pending").length;
+
+  await ctx.reply(
+    `🦁 LION GAMES ADMIN\n\n` +
+    `عدد اللاعبين: ${players}\n` +
+    `طلبات الشحن المعلقة: ${deposits}\n` +
+    `طلبات السحب المعلقة: ${withdrawals}`
+  );
+});
+
+// ================= ERROR HANDLING =================
+
+bot.catch((err) => {
+  console.error("Bot error:", err.message);
+});
+
+// ================= START BOT =================
+
+bot.start({
+  onStart: (info) => {
+    console.log("================================");
+    console.log("LION GAMES BOT IS RUNNING");
+    console.log("Bot:", info.username);
+    console.log("================================");
+  }
+});
