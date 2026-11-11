@@ -4,10 +4,10 @@ const path = require("path");
 module.exports = function(app, helpers) {
   const DB_FILE = path.join(__dirname, "..", "lion_database.json");
   const { csrf, validCsrf, page } = helpers;
+  const auth = require("./auth");
 
   function guard(req, res, next) {
-    if (!req.session.master) return res.redirect("/");
-    next();
+    auth.guard(req, res, next);
   }
 
   function loadDB() {
@@ -32,8 +32,15 @@ module.exports = function(app, helpers) {
       try {
         const db = loadDB();
         const items = db[type] || {};
-
-        const rows = Object.entries(items).map(([id, r]) => {
+        const agents = auth.loadAgents();
+        const visibleEntries = Object.entries(items).filter(([id, r]) => {
+          if (req.agent.role === "HEAD") return true;
+          const player = db.players && db.players[String(r.telegramId)];
+          return !!(player && r.ownerId && player.ownerId &&
+            String(r.ownerId) === String(player.ownerId) &&
+            auth.canAccessPlayer(req.agent, player, agents));
+        });
+        const rows = visibleEntries.map(([id, r]) => {
           const status = r.status || "unknown";
           const buttons = status === "pending" ? `
             <form method="POST" action="/${type}/process">
@@ -57,7 +64,7 @@ module.exports = function(app, helpers) {
         res.send(page(title, `
           <section class="panel">
             <h1>${title}</h1>
-            <p>عدد الطلبات: ${Object.keys(items).length}</p>
+            <p>عدد الطلبات ضمن صلاحيتك: ${visibleEntries.length}</p>
             <div style="overflow-x:auto">
               <table>
                 <thead><tr>
@@ -104,6 +111,12 @@ module.exports = function(app, helpers) {
 
         if (!player)
           return res.status(404).send("اللاعب غير موجود.");
+        if (req.agent.role !== "HEAD" &&
+            (!request.ownerId || !player.ownerId ||
+             String(request.ownerId) !== String(player.ownerId) ||
+             !auth.canAccessPlayer(req.agent, player, auth.loadAgents()))) {
+          return res.status(403).send("هذا الطلب خارج نطاق صلاحيتك.");
+        }
 
         const key = request.currency === "SYP" ? "syp" : "usd";
         const amount = Number(request.amount);
@@ -129,7 +142,9 @@ module.exports = function(app, helpers) {
         }
 
         request.processedAt = new Date().toISOString();
-        request.processedBy = "MASTER";
+        request.processedBy = req.agent.username || req.agent.role;
+        request.processedByAgentId = req.agent.id || null;
+        request.processedByRole = req.agent.role;
 
         db.adminTransactions = db.adminTransactions || [];
         db.adminTransactions.push({
@@ -142,7 +157,10 @@ module.exports = function(app, helpers) {
           currency: key,
           amount,
           note: type + " " + action,
-          by: "MASTER"
+          ownerId: player.ownerId || null,
+          by: req.agent.username || req.agent.role,
+          byAgentId: req.agent.id || null,
+          byRole: req.agent.role
         });
         db.adminTransactions = db.adminTransactions.slice(-5000);
 

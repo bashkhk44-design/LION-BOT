@@ -5,10 +5,10 @@ const path = require("path");
 module.exports = function(app, helpers) {
   const DB_FILE = path.join(__dirname, "..", "lion_database.json");
   const { csrf, validCsrf, page } = helpers;
+  const auth = require("./auth");
 
   function guard(req, res, next) {
-    if (!req.session.master) return res.redirect("/");
-    next();
+    auth.guard(req, res, next);
   }
 
   function loadDB() {
@@ -40,13 +40,14 @@ module.exports = function(app, helpers) {
     }
 
     const players = db.players || {};
+    const agents = auth.loadAgents();
     const q = String(req.query.q || "").trim().toLowerCase();
 
     const results = Object.entries(players).filter(([id, p]) => {
-      return !q ||
+      auth.canAccessPlayer(req.agent, p, agents) && (!q ||
         String(id).toLowerCase().includes(q) ||
         String(p.accountId || "").toLowerCase().includes(q) ||
-        String(p.username || "").toLowerCase().includes(q);
+        String(p.username || "").toLowerCase().includes(q));
     });
 
     const rows = results.map(([id, p]) => `
@@ -80,6 +81,11 @@ module.exports = function(app, helpers) {
     `).join("");
 
     const history = (db.adminTransactions || [])
+      .filter(t => {
+        if (req.agent.role === "HEAD") return true;
+        const player = players[String(t.playerId || "")];
+        return player && auth.canAccessPlayer(req.agent, player, agents);
+      })
       .slice(-20).reverse().map(t => `
         <tr>
           <td>${esc(t.date)}</td>
@@ -93,7 +99,7 @@ module.exports = function(app, helpers) {
     res.send(page("إدارة اللاعبين", `
       <section class="panel">
         <h1>👥 إدارة اللاعبين</h1>
-        <p>عدد الحسابات: ${Object.keys(players).length}</p>
+        <p>عدد الحسابات ضمن صلاحيتك: ${results.length}</p>
         <form method="GET" action="/players">
           <label>البحث برقم الحساب أو اسم المستخدم</label>
           <input name="q" value="${esc(q)}" placeholder="ابحث عن لاعب">
@@ -161,6 +167,9 @@ module.exports = function(app, helpers) {
       if (!player) {
         return res.status(404).send("اللاعب غير موجود.");
       }
+      if (req.agent.role !== "HEAD" && !auth.canAccessPlayer(req.agent, player, auth.loadAgents())) {
+        return res.status(403).send("هذا اللاعب خارج نطاق صلاحيتك.");
+      }
 
       const current = Number(player[currency] || 0);
       if (!Number.isFinite(current) || current < 0) {
@@ -190,7 +199,10 @@ module.exports = function(app, helpers) {
         currency,
         amount,
         note,
-        by: "MASTER"
+        ownerId: player.ownerId || null,
+        by: req.agent.username || req.agent.role,
+        byAgentId: req.agent.id || null,
+        byRole: req.agent.role
       });
 
       db.adminTransactions = db.adminTransactions.slice(-5000);

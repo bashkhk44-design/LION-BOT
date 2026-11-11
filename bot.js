@@ -45,6 +45,8 @@ if (fs.existsSync(DB_FILE)) {
   }
 }
 
+db.pendingInvites = db.pendingInvites || {};
+
 function saveDB() {
   const temp = DB_FILE + ".tmp";
   fs.writeFileSync(temp, JSON.stringify(db, null, 2));
@@ -156,6 +158,26 @@ const TERMS_TEXT = `🦅 أهلاً بك في BOSS EAGLE BET
 bot.command("start", async (ctx) => {
   sessions.delete(ctx.from.id);
   const id = String(ctx.from.id);
+  const payload = String(ctx.match || "").trim();
+
+  if (payload.startsWith("invite_") && !db.players[id]) {
+    const token = payload.slice(7);
+    try {
+      const agentsFile = path.join(__dirname, "admin", "data", "agents.json");
+      const data = JSON.parse(fs.readFileSync(agentsFile, "utf8"));
+      const cashier = (data.agents || []).find(a =>
+        a.role === "CASHIER" && a.active === true &&
+        a.inviteToken === token
+      );
+
+      if (cashier) {
+        db.pendingInvites[id] = cashier.id;
+        saveDB();
+      }
+    } catch (e) {
+      console.error("Invite validation error:", e.message);
+    }
+  }
 
   if (db.acceptedTerms[id]) {
     return ctx.reply(
@@ -427,11 +449,13 @@ bot.on("message:text", async (ctx) => {
       telegramId: id,
       accountId,
       username,
+      ownerId: (db.pendingInvites && db.pendingInvites[id]) || null,
       syp: 0,
       usd: 0,
       createdAt: new Date().toISOString()
     };
 
+    delete db.pendingInvites[id];
     saveDB();
     sessions.delete(ctx.from.id);
 
@@ -545,6 +569,7 @@ async function createDeposit(ctx, session, proof) {
     id: requestId,
     telegramId: id,
     accountId: player.accountId,
+    ownerId: player.ownerId || null,
     amount: session.amount,
     currency: method.currency,
     method: method.name,
@@ -608,6 +633,7 @@ async function createWithdrawal(ctx, session, address) {
     id: requestId,
     telegramId: id,
     accountId: player.accountId,
+    ownerId: player.ownerId || null,
     amount,
     fee,
     net,

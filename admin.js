@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const auth = require("./admin/auth");
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const app = express();
@@ -97,90 +98,175 @@ app.get("/admin", (req, res) => res.redirect("/"));
 
 app.get("/", (req, res) => {
   let hash;
-  try { hash = readMaster(); } catch { return res.status(500).send("ملف إعداد المدير تالف. راجع ملفات السيرفر."); }
-
-  if (!hash) {
-    return res.send(page("إعداد MASTER", `
-<section class="panel login"><h1>🦅 BOSS EAGLE BET</h1>
-<p>الإعداد الأول للمدير الرئيسي MASTER</p>
-<form method="POST" action="/send-code">
-<input type="hidden" name="csrf" value="${csrf(req)}">
-<button type="submit">إرسال رمز التحقق إلى Telegram</button></form>
-<form method="POST" action="/setup">
-<input type="hidden" name="csrf" value="${csrf(req)}">
-<label>رمز التحقق</label><input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
-<label>اختر كلمة مرور MASTER (12 حرفاً على الأقل)</label>
-<input type="password" name="password" minlength="12" maxlength="200" autocomplete="new-password" required>
-<label>تأكيد كلمة المرور</label>
-<input type="password" name="confirm" minlength="12" maxlength="200" autocomplete="new-password" required>
-<button type="submit">حفظ كلمة المرور</button></form></section>`));
+  try {
+    hash = readMaster();
+  } catch {
+    return res.status(500).send("ملف إعداد المدير تالف. راجع ملفات السيرفر.");
   }
 
-  if (!req.session.master) {
-    return res.send(page("دخول المدير", `
-<section class="panel login"><h1>🦅 BOSS EAGLE BET</h1><p>دخول المدير الرئيسي MASTER</p>
-<form method="POST" action="/login"><input type="hidden" name="csrf" value="${csrf(req)}">
-<label>كلمة مرور المدير</label><input type="password" name="password" required maxlength="200" autocomplete="current-password">
-<button type="submit">تسجيل الدخول</button></form></section>`));
+  if (!hash) {
+    return res.send(page("إعداد HEAD", `
+      <section class="panel login"><h1>🦅 BOSS EAGLE BET</h1>
+      <p>الإعداد الأول للمدير الرئيسي HEAD</p>
+      <form method="POST" action="/send-code">
+        <input type="hidden" name="csrf" value="${csrf(req)}">
+        <button type="submit">إرسال رمز التحقق إلى Telegram</button>
+      </form>
+      <form method="POST" action="/setup">
+        <input type="hidden" name="csrf" value="${csrf(req)}">
+        <label>رمز التحقق</label>
+        <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+        <label>كلمة مرور HEAD (12 حرفاً على الأقل)</label>
+        <input type="password" name="password" minlength="12" maxlength="200" autocomplete="new-password" required>
+        <label>تأكيد كلمة المرور</label>
+        <input type="password" name="confirm" minlength="12" maxlength="200" required>
+        <button type="submit">حفظ كلمة المرور</button>
+      </form></section>`));
+  }
+
+  const agent = auth.current(req);
+  if (!agent) {
+    return res.send(page("تسجيل الدخول", `
+      <section class="panel login"><h1>🦅 BOSS EAGLE BET</h1>
+      <p>تسجيل الدخول إلى لوحة الإدارة</p>
+      <form method="POST" action="/login">
+        <input type="hidden" name="csrf" value="${csrf(req)}">
+        <label>اسم المستخدم</label>
+        <input name="username" maxlength="24" autocomplete="username">
+        <label>كلمة المرور</label>
+        <input type="password" name="password" required maxlength="200" autocomplete="current-password">
+        <button type="submit">تسجيل الدخول</button>
+      </form></section>`));
   }
 
   let db = { players: {}, deposits: {}, withdrawals: {} };
   try {
-    if (fs.existsSync(DB_FILE)) db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, "utf8")) };
-  } catch { return res.status(500).send("تعذر قراءة قاعدة البيانات."); }
-
-  const players = Object.keys(db.players || {}).length;
-  const deposits = Object.values(db.deposits || {}).filter(x => x.status === "pending").length;
-  const withdrawals = Object.values(db.withdrawals || {}).filter(x => x.status === "pending").length;
-
-  let agentCount = 0;
-  try {
-    const agentFile = path.join(__dirname, "admin", "data", "agents.json");
-    if (fs.existsSync(agentFile)) {
-      const agentData = JSON.parse(fs.readFileSync(agentFile, "utf8"));
-      agentCount = Array.isArray(agentData.agents) ? agentData.agents.filter(a => a.active).length : 0;
+    if (fs.existsSync(DB_FILE)) {
+      db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, "utf8")) };
     }
-  } catch (e) { console.error("Agent summary error:", e.message); }
-  const transactions = Array.isArray(db.adminTransactions) ? db.adminTransactions.length : 0;
+  } catch {
+    return res.status(500).send("تعذر قراءة قاعدة البيانات.");
+  }
+
+  const agents = auth.loadAgents();
+  const roleNames = {
+    HEAD: "HEAD",
+    SUPER_MASTER: "SUPER MASTER",
+    MASTER: "MASTER",
+    CASHIER: "CASHIER"
+  };
+  const roleName = roleNames[agent.role] || "موظف";
+
+  const playerEntries = Object.entries(db.players || {}).filter(
+    ([id, player]) => auth.canAccessPlayer(agent, player, agents)
+  );
+  const visiblePlayerIds = new Set(playerEntries.map(([id]) => String(id)));
+
+  function requestInScope(request) {
+    if (agent.role === "HEAD") return true;
+    const player = db.players && db.players[String(request.telegramId)];
+    return !!(
+      player &&
+      request.ownerId &&
+      player.ownerId &&
+      String(request.ownerId) === String(player.ownerId) &&
+      auth.canAccessPlayer(agent, player, agents)
+    );
+  }
+
+  const deposits = Object.values(db.deposits || {}).filter(
+    x => x.status === "pending" && requestInScope(x)
+  ).length;
+
+  const withdrawals = Object.values(db.withdrawals || {}).filter(
+    x => x.status === "pending" && requestInScope(x)
+  ).length;
+
+  const visibleAgents = auth.descendants(agent, agents);
+  const agentCount = visibleAgents.filter(
+    a => a.id !== agent.id && a.active === true
+  ).length;
+
+  const transactions = (Array.isArray(db.adminTransactions) ? db.adminTransactions : [])
+    .filter(tx => {
+      if (agent.role === "HEAD") return true;
+      const player = db.players && db.players[String(tx.telegramId)];
+      return !!(player && visiblePlayerIds.has(String(tx.telegramId)) &&
+        auth.canAccessPlayer(agent, player, agents));
+    }).length;
+
   const uptime = Math.floor(process.uptime() / 60);
-  res.send(page("لوحة MASTER", `
-<div class="dashboard-shell">
- <aside class="sidebar">
-  <div class="side-brand"><div class="eagle-mark">🦅</div><div><b>BOSS EAGLE</b><small>MASTER CONTROL</small></div></div>
-  <div class="side-caption">القائمة الرئيسية</div>
-  <a class="side-link active" href="/"><span>▦</span> لوحة التحكم</a>
-  <a class="side-link" href="/agents"><span>♙</span> الوكلاء ورؤساء الوكلاء</a>
-  <a class="side-link" href="/players"><span>♧</span> حسابات اللاعبين</a>
-  <a class="side-link" href="/deposits"><span>＋</span> طلبات الإيداع <i>${deposits}</i></a>
-  <a class="side-link" href="/withdrawals"><span>－</span> طلبات السحب <i>${withdrawals}</i></a>
-  <div class="side-caption">النظام</div><a class="side-link" href="#system"><span>⌘</span> حالة النظام</a>
-  <div class="side-footer"><span class="online-dot"></span> MASTER متصل</div>
- </aside>
- <section class="dashboard-main">
-  <header class="dash-topbar"><div><small>مركز الإدارة / الرئيسية</small><h1>لوحة التحكم الرئيسية</h1></div>
-   <form method="POST" action="/logout"><input type="hidden" name="csrf" value="${csrf(req)}"><button class="secondary">تسجيل الخروج</button></form>
-  </header>
-  <section class="welcome-banner"><div><span class="eyebrow">BOSS EAGLE BET • CONTROL CENTER</span><h2>مرحباً بك، MASTER</h2><p>إدارة ومتابعة النظام من مكان واحد.</p></div><div class="banner-emblem">🦅</div></section>
-  <div class="section-heading"><div><small>نظرة عامة</small><h2>ملخص المنصة</h2></div><span class="live-label"><b></b> النظام يعمل</span></div>
-  <section class="stat-grid">
-   <a class="stat-card" href="/players"><span class="stat-icon">♙</span><small>إجمالي اللاعبين</small><strong>${players}</strong><em>عرض الحسابات ←</em></a>
-   <a class="stat-card" href="/agents"><span class="stat-icon">♧</span><small>الوكلاء النشطون</small><strong>${agentCount}</strong><em>إدارة شبكة الوكلاء ←</em></a>
-   <a class="stat-card" href="/deposits"><span class="stat-icon">＋</span><small>إيداعات بانتظار المراجعة</small><strong>${deposits}</strong><em>مراجعة الطلبات ←</em></a>
-   <a class="stat-card" href="/withdrawals"><span class="stat-icon">－</span><small>سحوبات بانتظار المراجعة</small><strong>${withdrawals}</strong><em>مراجعة الطلبات ←</em></a>
-  </section>
-  <div class="section-heading"><div><small>اختصارات الإدارة</small><h2>الوصول السريع</h2></div></div>
-  <section class="quick-grid">
-   <a href="/agents"><span>♙</span><b>إدارة الوكلاء</b><small>إنشاء رئيس وكلاء أو وكيل وربط التبعية</small><strong>فتح القسم ←</strong></a>
-   <a href="/players"><span>♧</span><b>إدارة اللاعبين</b><small>البحث عن الحسابات وتعديل الأرصدة</small><strong>فتح القسم ←</strong></a>
-   <a href="/deposits"><span>＋</span><b>طلبات الإيداع</b><small>مراجعة طلبات شحن الحسابات</small><strong>فتح القسم ←</strong></a>
-   <a href="/withdrawals"><span>↗</span><b>طلبات السحب</b><small>متابعة طلبات السحب ومعالجتها</small><strong>فتح القسم ←</strong></a>
-  </section>
-  <section class="system-panel" id="system"><div><small>مراقبة التشغيل</small><h2>حالة النظام</h2><p><span class="online-dot"></span> لوحة الإدارة تعمل على الخادم</p></div>
-   <div class="system-metrics"><div><small>إصدار Node.js</small><b>${esc(process.version)}</b></div><div><small>منفذ التطبيق</small><b>${esc(PORT)}</b></div><div><small>مدة التشغيل</small><b>${uptime} دقيقة</b></div><div><small>سجل عمليات الإدارة</small><b>${transactions}</b></div></div>
-  </section>
-  <footer class="dash-footer">BOSS EAGLE BET MASTER <span>لوحة الإدارة الرئيسية</span></footer>
- </section>
-</div>`));
+  const canSeeAgents = ["HEAD", "SUPER_MASTER", "MASTER"].includes(agent.role);
+
+  const agentLink = canSeeAgents
+    ? '<a class="side-link" href="/agents"><span>♙</span> الوكلاء والرتب</a>'
+    : '';
+
+  const agentCard = canSeeAgents
+    ? `<a class="stat-card" href="/agents"><span class="stat-icon">♧</span><small>الوكلاء التابعون</small><strong>${agentCount}</strong><em>إدارة شبكة الوكلاء ←</em></a>`
+    : '';
+
+  const agentQuick = canSeeAgents
+    ? '<a href="/agents"><span>♙</span><b>إدارة الوكلاء</b><small>إدارة الرتب التابعة لك</small><strong>فتح القسم ←</strong></a>'
+    : '';
+
+  res.send(page("لوحة " + roleName, `
+  <div class="dashboard-shell">
+   <aside class="sidebar">
+    <div class="side-brand"><div class="eagle-mark">🦅</div><div><b>BOSS EAGLE</b><small>${roleName} CONTROL</small></div></div>
+    <div class="side-caption">القائمة الرئيسية</div>
+    <a class="side-link active" href="/"><span>▦</span> لوحة التحكم</a>
+    ${agentLink}
+    <a class="side-link" href="/players"><span>♧</span> حسابات اللاعبين</a>
+    <a class="side-link" href="/deposits"><span>＋</span> طلبات الإيداع <i>${deposits}</i></a>
+    <a class="side-link" href="/withdrawals"><span>－</span> طلبات السحب <i>${withdrawals}</i></a>
+    <div class="side-caption">النظام</div>
+    <a class="side-link" href="#system"><span>⌘</span> حالة النظام</a>
+    <div class="side-footer"><span class="online-dot"></span> ${roleName} متصل</div>
+   </aside>
+   <section class="dashboard-main">
+    <header class="dash-topbar">
+     <div><small>BOSS EAGLE / ${roleName}</small><h1>لوحة التحكم</h1></div>
+     <form method="POST" action="/logout">
+      <input type="hidden" name="csrf" value="${csrf(req)}">
+      <button class="secondary">تسجيل الخروج</button>
+     </form>
+    </header>
+    <section class="welcome-banner">
+     <div><span class="eyebrow">BOSS EAGLE BET • CONTROL CENTER</span>
+      <h2>مرحباً بك، ${roleName}</h2>
+      <p>إدارة ومتابعة الحسابات والطلبات ضمن صلاحياتك.</p>
+     </div><div class="banner-emblem">🦅</div>
+    </section>
+    <div class="section-heading"><div><small>نظرة عامة</small><h2>ملخص حسابك</h2></div>
+     <span class="live-label"><b></b> النظام يعمل</span>
+    </div>
+    <section class="stat-grid">
+     <a class="stat-card" href="/players"><span class="stat-icon">♙</span><small>اللاعبون ضمن صلاحياتك</small><strong>${playerEntries.length}</strong><em>عرض الحسابات ←</em></a>
+     ${agentCard}
+     <a class="stat-card" href="/deposits"><span class="stat-icon">＋</span><small>إيداعات بانتظار المراجعة</small><strong>${deposits}</strong><em>مراجعة الطلبات ←</em></a>
+     <a class="stat-card" href="/withdrawals"><span class="stat-icon">－</span><small>سحوبات بانتظار المراجعة</small><strong>${withdrawals}</strong><em>مراجعة الطلبات ←</em></a>
+    </section>
+    <div class="section-heading"><div><small>اختصارات الإدارة</small><h2>الوصول السريع</h2></div></div>
+    <section class="quick-grid">
+     ${agentQuick}
+     <a href="/players"><span>♧</span><b>إدارة اللاعبين</b><small>البحث عن الحسابات وتعديل الأرصدة المسموحة</small><strong>فتح القسم ←</strong></a>
+     <a href="/deposits"><span>＋</span><b>طلبات الإيداع</b><small>مراجعة الطلبات التابعة لك</small><strong>فتح القسم ←</strong></a>
+     <a href="/withdrawals"><span>↗</span><b>طلبات السحب</b><small>متابعة الطلبات التابعة لك</small><strong>فتح القسم ←</strong></a>
+    </section>
+    <section class="system-panel" id="system">
+     <div><small>مراقبة التشغيل</small><h2>حالة النظام</h2>
+      <p><span class="online-dot"></span> لوحة الإدارة تعمل على الخادم</p>
+     </div>
+     <div class="system-metrics">
+      <div><small>إصدار Node.js</small><b>${esc(process.version)}</b></div>
+      <div><small>مدة التشغيل</small><b>${uptime} دقيقة</b></div>
+      <div><small>عمليات ضمن صلاحياتك</small><b>${transactions}</b></div>
+     </div>
+    </section>
+    <footer class="dash-footer">BOSS EAGLE BET <span>${roleName} PANEL</span></footer>
+   </section>
+  </div>`));
 });
 
 app.post("/send-code", async (req, res) => {
@@ -230,15 +316,61 @@ app.post("/setup", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   if (!validCsrf(req)) return res.status(403).send("طلب غير صالح. أعد تحميل الصفحة.");
-  const hash = readMaster();
-  if (!hash) return res.redirect("/");
+
+  const username = String(req.body.username || "").trim();
   const password = String(req.body.password || "");
-  if (password.length > 200 || !(await bcrypt.compare(password, hash))) {
-    return res.status(401).send("كلمة المرور غير صحيحة. <a href='/'>حاول مجدداً</a>");
+  if (!password || password.length > 200) {
+    return res.status(401).send("بيانات الدخول غير صحيحة.");
   }
+
+  let authenticatedAgent = null;
+
+  if (username) {
+    const agentsFile = path.join(__dirname, "admin", "data", "agents.json");
+    try {
+      const data = JSON.parse(fs.readFileSync(agentsFile, "utf8"));
+      const agents = Array.isArray(data.agents) ? data.agents : [];
+      const agent = agents.find(a =>
+        String(a.username || "").toLowerCase() === username.toLowerCase() &&
+        a.active === true
+      );
+
+      if (agent && await bcrypt.compare(password, agent.passwordHash)) {
+        const allowedRoles = ["HEAD", "HEAD_AGENT", "SUPER_MASTER", "MASTER", "CASHIER"];
+        if (allowedRoles.includes(agent.role)) {
+          authenticatedAgent = agent;
+          if (agent.role === "HEAD_AGENT") {
+            agent.role = "HEAD";
+            const temp = agentsFile + ".tmp";
+            fs.writeFileSync(temp, JSON.stringify({ agents }, null, 2), { mode: 0o600 });
+            fs.renameSync(temp, agentsFile);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Agent login error:", e.message);
+      return res.status(500).send("تعذر التحقق من حساب الموظف.");
+    }
+
+    if (!authenticatedAgent) {
+      return res.status(401).send("اسم المستخدم أو كلمة المرور غير صحيحة.");
+    }
+  } else {
+    const hash = readMaster();
+    if (!hash || !(await bcrypt.compare(password, hash))) {
+      return res.status(401).send("كلمة المرور غير صحيحة.");
+    }
+  }
+
   req.session.regenerate(err => {
     if (err) return res.status(500).send("تعذر إنشاء جلسة الدخول.");
-    req.session.master = true;
+
+    req.session.role = authenticatedAgent
+      ? (authenticatedAgent.role === "HEAD_AGENT" ? "HEAD" : authenticatedAgent.role)
+      : "HEAD";
+    req.session.agentId = authenticatedAgent ? authenticatedAgent.id : null;
+    req.session.username = authenticatedAgent ? authenticatedAgent.username : "MASTER";
+    req.session.master = req.session.role === "HEAD";
     req.session.csrf = crypto.randomBytes(32).toString("hex");
     res.redirect("/");
   });
