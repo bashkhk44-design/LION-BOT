@@ -83,7 +83,7 @@ bot.on("callback_query:data", async (ctx) => {
     req.status = "approved";
     save();
     await bot.api.sendMessage(Number(req.userId),
-      `✅ تمت الموافقة على طلب الشحن رقم ${id}.`);
+      `✅ تم تحويل الرصيد إلى الموقع بنجاح.\nتمت إضافة ${req.amount} ${req.currency} إلى حسابك في LION GAMES.`);
     await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     await ctx.answerCallbackQuery({ text: "تمت الموافقة." });
   }
