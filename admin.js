@@ -357,11 +357,18 @@ app.post("/login", async (req, res) => {
         }
       }
     } catch (e) {
-      console.error("Agent login error:", e.message);
-      return res.status(500).send("تعذر التحقق من حساب الموظف.");
+      if (e.code !== "ENOENT") {
+        console.error("Agent login error:", e.message);
+        return res.status(500).send("تعذر التحقق من حساب الموظف.");
+      }
+      // Older HEAD installations may only have master.json, without agents.json.
+      const legacyHash = readMaster();
+      if (!legacyHash || !(await bcrypt.compare(password, legacyHash))) {
+        return res.status(401).send("اسم المستخدم أو كلمة المرور غير صحيحة.");
+      }
     }
 
-    if (!authenticatedAgent) {
+    if (!authenticatedAgent && fs.existsSync(path.join(__dirname, "admin", "data", "agents.json"))) {
       return res.status(401).send("اسم المستخدم أو كلمة المرور غير صحيحة.");
     }
   } else {
