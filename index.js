@@ -27,7 +27,8 @@ function mainMenu() {
   return new Keyboard()
     .text("👤 إنشاء حساب").text("💰 رصيدي").row()
     .text("💳 شحن المحفظة").text("💸 سحب الرصيد").row()
-    .text("🌐 موقع الألعاب").text("📞 مراسلة الدعم")
+    .text("🌐 موقع الألعاب").text("📞 مراسلة الدعم").row()
+    .text("🗑️ حذف الحساب")
     .resized();
 }
 
@@ -144,6 +145,21 @@ bot.on("message:text", async (ctx) => {
     return ctx.reply("القائمة الرئيسية:", { reply_markup: mainMenu() });
   }
 
+
+  if (text === "\u{1F5D1}\uFE0F \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628") {
+    if (!user) return ctx.reply("\u0644\u0627 \u064A\u0648\u062C\u062F \u062D\u0633\u0627\u0628 \u0644\u062D\u0630\u0641\u0647.");
+    const pending = Object.values(db.deposits).some(r => r.userId === id && r.status === "pending") ||
+                    Object.values(db.withdrawals).some(r => r.userId === id && r.status === "pending");
+    if (pending) return ctx.reply("\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628 \u0645\u0639 \u0648\u062C\u0648\u062F \u0637\u0644\u0628 \u0645\u0639\u0644\u0642.");
+    sessions.set(id, { step: "delete_account_confirm" });
+    return ctx.reply(
+      "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F\u061F \u0633\u064A\u062A\u0645 \u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0628 \u0648\u0627\u0644\u0631\u0635\u064A\u062F \u0641\u0642\u0637\u060C \u0645\u0639 \u0627\u0644\u0627\u062D\u062A\u0641\u0627\u0638 \u0628\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0634\u062D\u0646 \u0648\u0627\u0644\u0633\u062D\u0628.",
+      { reply_markup: new Keyboard()
+        .text("\u2705 \u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641").row()
+        .text("\u274C \u0625\u0644\u063A\u0627\u0621").resized() }
+    );
+  }
+
   if (text === "👤 إنشاء حساب") {
     if (user) return ctx.reply("لديك حساب مسجل بالفعل.");
     sessions.set(id, { step: "register_name" });
@@ -151,6 +167,27 @@ bot.on("message:text", async (ctx) => {
   }
 
   const session = sessions.get(id);
+
+  if (session?.step === "delete_account_confirm") {
+    if (text === "\u274C \u0625\u0644\u063A\u0627\u0621") {
+      sessions.delete(id);
+      return ctx.reply("\u062A\u0645 \u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u062D\u0630\u0641.", { reply_markup: mainMenu() });
+    }
+    if (text === "\u2705 \u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641") {
+      const pending = Object.values(db.deposits).some(r => r.userId === id && r.status === "pending") ||
+                      Object.values(db.withdrawals).some(r => r.userId === id && r.status === "pending");
+      if (pending) {
+        sessions.delete(id);
+        return ctx.reply("\u0644\u0627 \u064A\u0645\u0643\u0646 \u062D\u0630\u0641 \u0627\u0644\u062D\u0633\u0627\u0628 \u0645\u0639 \u0648\u062C\u0648\u062F \u0637\u0644\u0628 \u0645\u0639\u0644\u0642.", { reply_markup: mainMenu() });
+      }
+      delete db.users[id];
+      sessions.delete(id);
+      save();
+      return ctx.reply("\u062A\u0645 \u062D\u0630\u0641 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062D\u0633\u0627\u0628. \u064A\u0645\u0643\u0646\u0643 \u0625\u0646\u0634\u0627\u0621 \u062D\u0633\u0627\u0628 \u062C\u062F\u064A\u062F \u0627\u0644\u0622\u0646.", { reply_markup: mainMenu() });
+    }
+    return ctx.reply("\u0627\u062E\u062A\u0631 \u062A\u0623\u0643\u064A\u062F \u0627\u0644\u062D\u0630\u0641 \u0623\u0648 \u0625\u0644\u063A\u0627\u0621.");
+  }
+
 
   if (session?.step === "register_name") {
     if (text.length < 2 || text.length > 40)
