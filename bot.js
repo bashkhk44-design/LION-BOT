@@ -11,10 +11,10 @@ const ADMIN_ID = "5113787057";
 const WEBSITE_URL = process.env.WEBSITE_URL || "https://eaglebet99.com/";
 
 const PAYMENTS = {
-  sham_syp: process.env.SHAM_SYP_ADDRESS || "",
-  sham_usd: process.env.SHAM_USD_ADDRESS || "",
-  syriatel: process.env.SYRIATEL_ADDRESS || "",
-  usdt: process.env.USDT_BEP20_ADDRESS || ""
+  sham_syp: "46d690b623b41d959bd438568e5cd913",
+  sham_usd: "46d690b623b41d959bd438568e5cd913",
+  syriatel: "85370602",
+  usdt: "0x172ae5bCaEcbFe258b70b41EC372bB2f8E04C761"
 };
 
 if (!TOKEN || !ADMIN_ID) {
