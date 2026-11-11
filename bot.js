@@ -405,7 +405,7 @@ bot.on("message:text", async (ctx) => {
       `المبلغ: ${money(amount, session.currency)}\n` +
       `العمولة 10%: ${money(fee, session.currency)}\n` +
       `المبلغ الذي ستستلمه: ${money(net, session.currency)}\n\n` +
-      `أرسل رقم حسابك أو عنوان الاستلام الآن.`,
+      `📩 أرسل عنوان شام كاش أو سيرياتيل كاش الخاص بك لاستلام المبلغ:`,
       { reply_markup: cancelKeyboard() }
     );
     return;
