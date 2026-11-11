@@ -15,14 +15,21 @@ const ADMIN_ID = process.env.ADMIN_ID || "5113787057";
 const DB_FILE = path.join(__dirname, "lion_database.json");
 const MASTER_FILE = path.join(__dirname, "admin", "data", "master.json");
 
-if (!TOKEN || !ADMIN_ID || !/^\d+$/.test(ADMIN_ID)) {
-  console.error("Set valid TELEGRAM_BOT_TOKEN and numeric ADMIN_ID.");
-  process.exit(1);
+if (!ADMIN_ID || !/^\d+$/.test(ADMIN_ID)) {
+  throw new Error("Set a numeric ADMIN_ID.");
 }
 
-// Derive the session secret from the bot token; no third host variable is needed.
-const SESSION_SECRET = crypto.createHmac("sha256", TOKEN)
-  .update("BOSS-EAGLE-MASTER-SESSION-v1").digest("hex");
+// Keep the session secret independent from Telegram and stable across restarts.
+const SECRET_FILE = path.join(__dirname, "admin", "data", "session-secret");
+fs.mkdirSync(path.dirname(SECRET_FILE), { recursive: true });
+let SESSION_SECRET = process.env.ADMIN_SESSION_SECRET;
+if (!SESSION_SECRET) {
+  try { SESSION_SECRET = fs.readFileSync(SECRET_FILE, "utf8").trim(); } catch {}
+  if (!SESSION_SECRET) {
+    SESSION_SECRET = crypto.randomBytes(48).toString("hex");
+    fs.writeFileSync(SECRET_FILE, SESSION_SECRET, { mode: 0o600 });
+  }
+}
 
 fs.mkdirSync(path.dirname(MASTER_FILE), { recursive: true });
 
@@ -80,6 +87,7 @@ let setupCodeExpires = 0;
 let lastCodeSent = 0;
 
 async function sendSetupCode() {
+  if (!TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is not configured.");
   const code = String(crypto.randomInt(100000, 1000000));
   const response = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method: "POST",
