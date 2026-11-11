@@ -137,6 +137,7 @@ app.post("/logout", (req, res) => {
 });
 
 require("./admin/agents")(app,{csrf,validCsrf,page});
+require("./admin/players")(app,{csrf,validCsrf,page});
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`BOSS MASTER PANEL running on port ${PORT}`);
