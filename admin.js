@@ -147,10 +147,10 @@ app.get("/", (req, res) => {
   res.send(page("لوحة MASTER", `
 <div class="dashboard-shell">
  <aside class="sidebar">
-  <div class="side-brand"><div class="eagle-mark">🦅</div><div><b>BOSS EAGLE</b><small>MASTER CONTROL</small></div></div>
-  <div class="side-caption">القائمة الرئيسية</div>
+  <div class="side-brand"><div class="eagle-mark">🦅</div><div><b>BOSS EAGLE</b><small>HEAD OFFICE • MASTER</small></div></div>
+  <div class="side-caption">HEAD OFFICE</div>
   <a class="side-link active" href="/"><span>▦</span> لوحة التحكم</a>
-  <a class="side-link" href="/agents"><span>♙</span> الوكلاء ورؤساء الوكلاء</a>
+  <a class="side-link" href="/agents"><span>♙</span> شجرة الوكلاء</a>
   <a class="side-link" href="/players"><span>♧</span> حسابات اللاعبين</a>
   <a class="side-link" href="/deposits"><span>＋</span> طلبات الإيداع <i>${deposits}</i></a>
   <a class="side-link" href="/withdrawals"><span>－</span> طلبات السحب <i>${withdrawals}</i></a>
@@ -158,10 +158,10 @@ app.get("/", (req, res) => {
   <div class="side-footer"><span class="online-dot"></span> MASTER متصل</div>
  </aside>
  <section class="dashboard-main">
-  <header class="dash-topbar"><div><small>مركز الإدارة / الرئيسية</small><h1>لوحة التحكم الرئيسية</h1></div>
+  <header class="dash-topbar"><div><small>HEAD OFFICE / CONTROL CENTER</small><h1>المكتب الرئيسي</h1></div>
    <form method="POST" action="/logout"><input type="hidden" name="csrf" value="${csrf(req)}"><button class="secondary">تسجيل الخروج</button></form>
   </header>
-  <section class="welcome-banner"><div><span class="eyebrow">BOSS EAGLE BET • CONTROL CENTER</span><h2>مرحباً بك، MASTER</h2><p>إدارة ومتابعة النظام من مكان واحد.</p></div><div class="banner-emblem">🦅</div></section>
+  <section class="welcome-banner"><div><span class="eyebrow">BOSS EAGLE BET • HEAD OFFICE</span><h2>مرحباً بك، MASTER</h2><p>المركز الرئيسي لإدارة الرؤساء والوكلاء واللاعبين والعمليات.</p></div><div class="banner-emblem">🦅</div></section>
   <div class="section-heading"><div><small>نظرة عامة</small><h2>ملخص المنصة</h2></div><span class="live-label"><b></b> النظام يعمل</span></div>
   <section class="stat-grid">
    <a class="stat-card" href="/players"><span class="stat-icon">♙</span><small>إجمالي اللاعبين</small><strong>${players}</strong><em>عرض الحسابات ←</em></a>
@@ -179,7 +179,7 @@ app.get("/", (req, res) => {
   <section class="system-panel" id="system"><div><small>مراقبة التشغيل</small><h2>حالة النظام</h2><p><span class="online-dot"></span> لوحة الإدارة تعمل على الخادم</p></div>
    <div class="system-metrics"><div><small>إصدار Node.js</small><b>${esc(process.version)}</b></div><div><small>منفذ التطبيق</small><b>${esc(PORT)}</b></div><div><small>مدة التشغيل</small><b>${uptime} دقيقة</b></div><div><small>سجل عمليات الإدارة</small><b>${transactions}</b></div></div>
   </section>
-  <footer class="dash-footer">BOSS EAGLE BET MASTER <span>لوحة الإدارة الرئيسية</span></footer>
+  <footer class="dash-footer">BOSS EAGLE BET MASTER <span>HEAD OFFICE • MASTER CONTROL</span></footer>
  </section>
 </div>`));
 });
