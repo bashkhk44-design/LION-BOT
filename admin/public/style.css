@@ -1,0 +1,104 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #101010;
+  color: #f5f0df;
+  font-family: Arial, sans-serif;
+}
+.container {
+  max-width: 1000px;
+  margin: 35px auto;
+  padding: 16px;
+}
+.panel {
+  background: #1c1c1c;
+  border: 1px solid #55451e;
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.login {
+  max-width: 430px;
+  margin: 70px auto;
+}
+h1, h2 { color: #d9b75b; }
+p, small { color: #aaa; }
+label { display: block; margin: 18px 0 8px; }
+input {
+  width: 100%;
+  padding: 14px;
+  background: #101010;
+  color: white;
+  border: 1px solid #80672e;
+  border-radius: 8px;
+}
+button {
+  margin-top: 18px;
+  padding: 13px 22px;
+  background: #c6a34b;
+  color: #111;
+  border: 0;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.secondary { background: #333; color: white; }
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 15px;
+}
+.grid strong {
+  display: block;
+  color: #e4c56b;
+  font-size: 32px;
+  margin-top: 15px;
+}
+@media(max-width:500px) {
+  .top { align-items: flex-start; }
+  .container { margin: 10px auto; }
+}
+
+select {
+  width: 100%;
+  padding: 13px;
+  margin-top: 8px;
+  background: #101010;
+  color: white;
+  border: 1px solid #80672e;
+  border-radius: 8px;
+}
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px; border-bottom: 1px solid #55451e; text-align: right; }
+th { color: #d9b75b; }
+a { color: #e4c56b; }
+
+a.nav-card {
+  display: block;
+  color: #e4c56b;
+  text-decoration: none;
+}
+.admin-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+  gap: 12px;
+}
+.admin-menu a {
+  display: block;
+  padding: 18px;
+  background: #29251c;
+  border: 1px solid #80672e;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #e4c56b;
+}
+.admin-menu a:hover {
+  background: #40351e;
+}
