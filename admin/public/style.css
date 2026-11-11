@@ -187,7 +187,7 @@ td input, td select { min-width: 115px; }
 }
 
 /* BOSS EAGLE MASTER dashboard refresh */
-.dashboard-shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:22px;direction:rtl;align-items:start}
+.dashboard-shell{display:grid;grid-template-columns:245px minmax(0,1fr);gap:22px;direction:ltr;align-items:start}.sidebar,.dashboard-main{direction:rtl}
 .sidebar{position:sticky;top:14px;min-height:calc(100vh - 28px);padding:20px 14px;background:linear-gradient(180deg,#17140e,#090909 70%);border:1px solid #76591f;border-radius:18px;box-shadow:0 15px 45px #0009}
 .side-brand{display:flex;align-items:center;gap:11px;padding:8px 8px 22px;border-bottom:1px solid #c59a3b33;color:#ffe39a}
 .eagle-mark{display:grid;place-items:center;width:45px;height:45px;border:1px solid #d6ae55;border-radius:13px;background:linear-gradient(145deg,#493719,#111);font-size:25px}
