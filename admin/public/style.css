@@ -230,3 +230,37 @@ td input, td select { min-width: 115px; }
 .tree-status.on{color:#79e3ad;background:#143322}.tree-status.off{color:#f2a1a1;background:#3b1919}
 .tree-empty{padding:12px;text-align:center;color:#8f846a;font-size:11px}
 @media(max-width:650px){.agent-tree-list{grid-template-columns:1fr}.tree-master{margin-bottom:12px}.agent-tree-head{padding:11px}}
+
+
+/* BOSS EAGLE BET MASTER — dashboard visual match */
+.dashboard-main{display:flex;flex-direction:column;gap:0}
+.dash-topbar{order:0;min-height:88px;padding:12px 22px;margin-bottom:18px;border:1px solid #72551f;border-radius:15px;background:linear-gradient(100deg,#17130b,#080808 65%,#201707);box-shadow:0 8px 30px #0009}
+.dash-topbar h1{font-size:clamp(22px,3vw,34px);letter-spacing:.5px}
+.dash-topbar small{letter-spacing:2px}
+.welcome-banner{order:5;min-height:150px;margin-top:18px;margin-bottom:0;overflow:hidden}
+.stat-grid{order:1;margin-bottom:18px}
+.stat-card{position:relative;min-height:132px;padding:17px 18px 15px 62px;background:linear-gradient(135deg,#17152a,#101019);border-color:#55418a}
+.stat-card:nth-child(2){background:linear-gradient(135deg,#102a1b,#0b1710);border-color:#1e7543}
+.stat-card:nth-child(3){background:linear-gradient(135deg,#382607,#171006);border-color:#9b6a16}
+.stat-card:nth-child(4){background:linear-gradient(135deg,#351016,#17090c);border-color:#8e1d2a}
+.stat-card .stat-icon{position:absolute;right:15px;top:18px;width:40px;height:40px;background:#ffffff12;color:#ffe39a;font-size:24px}
+.stat-card small{font-size:12px}.stat-card strong{font-size:29px;color:#fff;margin:3px 0}.stat-card em{color:#59d992}
+.overview-grid{order:2;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:16px;margin-bottom:18px}
+.chart-panel,.health-panel,.recent-panel{min-width:0;padding:19px;border:1px solid #343434;border-radius:14px;background:linear-gradient(145deg,#151515,#0c0c0c);box-shadow:0 10px 28px #0008}
+.panel-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:13px;margin-bottom:12px;border-bottom:1px solid #ffffff12}
+.panel-heading h2{margin:2px 0 0;font-size:17px;color:#ffe39a}.panel-heading small{font-size:10px;color:#9e906e}.panel-heading>span{font-size:24px;color:#eac66e}
+.activity-chart{height:205px;display:flex;align-items:flex-end;justify-content:space-around;gap:10px;padding:12px 5px 0;background:repeating-linear-gradient(to top,transparent 0,transparent 48px,#ffffff0b 49px,#ffffff0b 50px)}
+.chart-column{height:100%;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:7px;min-width:0}
+.chart-column i{display:block;width:min(34px,75%);min-height:4px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,#ffe18a,#c58b22);box-shadow:0 0 14px #d8a83c45}
+.chart-column small{font-size:9px;color:#c9c0ac;white-space:nowrap}.chart-value{font-size:10px;color:#f5d47d}
+.health-check{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#36d67b;color:#07140c;font-weight:900}
+.health-row{display:flex;justify-content:space-between;gap:12px;padding:12px 2px;border-bottom:1px solid #ffffff0d;font-size:12px;color:#d9d2c4}.health-row:last-child{border:0}.health-row b{color:#f4dfaa}.health-row .state-ok{padding:2px 12px;border-radius:8px;background:#145c32;color:#8df0b1}
+.recent-grid{order:3;display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.recent-panel{padding:17px}.panel-heading>a{font-size:10px;color:#d9b45d;white-space:nowrap}
+.activity-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #ffffff0b}.activity-row:last-child{border:0}
+.activity-avatar{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:50%;background:#302746;color:#d9c7ff;font-size:18px}
+.request-icon{background:#3a2b12;color:#ffe39a;border-radius:9px}.activity-row>div{min-width:0;flex:1}.activity-row b,.activity-row small{display:block;overflow-wrap:anywhere}.activity-row b{font-size:11px;color:#f1e9d8}.activity-row small{font-size:9px;color:#8e887c}.activity-row em{font-size:9px;font-style:normal;color:#8ce6aa}.activity-row .request-state{color:#f1d17a}
+.empty-note{font-size:11px;text-align:center;padding:16px;color:#8f8776}
+.quick-grid{order:4;margin-top:0}.system-panel{order:4}.dash-footer{order:6}
+@media(max-width:900px){.overview-grid{grid-template-columns:1fr}.recent-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.dash-topbar{padding:12px;margin-bottom:13px}.stat-card{padding:12px 12px 12px 48px;min-height:116px}.stat-card .stat-icon{right:10px;top:12px;width:32px;height:32px;font-size:19px}.stat-card strong{font-size:24px}.chart-panel,.health-panel,.recent-panel{padding:13px}.activity-chart{height:165px}.chart-column small{font-size:8px}}
