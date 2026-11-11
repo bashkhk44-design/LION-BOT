@@ -1,0 +1,16 @@
+{
+  "name": "lion-games-bot",
+  "version": "1.0.0",
+  "description": "LION GAMES Telegram Bot",
+  "main": "bot.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "grammy": "^1.30.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
