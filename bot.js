@@ -17,10 +17,8 @@ const PAYMENTS = {
   usdt: "0x172ae5bCaEcbFe258b70b41EC372bB2f8E04C761"
 };
 
-if (!TOKEN || !ADMIN_ID) {
-  console.error("TOKEN EXISTS:", Boolean(TOKEN));
-  console.error("ADMIN ID EXISTS:", Boolean(ADMIN_ID));
-  process.exit(1);
+if (!TOKEN || !ADMIN_ID || !/^\d+$/.test(ADMIN_ID)) {
+  throw new Error("TELEGRAM_BOT_TOKEN or numeric ADMIN_ID is missing.");
 }
 
 const bot = new Bot(TOKEN);
