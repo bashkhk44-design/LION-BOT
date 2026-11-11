@@ -5,6 +5,8 @@ const FILE = path.join(__dirname, "data", "agents.json");
 const LEVELS = ["HEAD", "SUPER_MASTER", "MASTER", "CASHIER"];
 
 function loadAgents() {
+  // Fresh deployments may not have an employee database yet.
+  if (!fs.existsSync(FILE)) return [];
   const data = JSON.parse(fs.readFileSync(FILE, "utf8"));
   return Array.isArray(data.agents) ? data.agents : [];
 }
