@@ -240,7 +240,13 @@ bot.on("message:text", async (ctx) => {
       "سيرياتيل كاش": "SYRIATEL_ADDRESS",
       "USDT BEP20": "USDT_BEP20_ADDRESS"
     };
-    s.address = process.env[envNames[text]] || "";
+    const addresses = {
+      "شام كاش - ليرة": "46d690b623b41d959bd438568e5cd913",
+      "شام كاش - دولار": "46d690b623b41d959bd438568e5cd913",
+      "سيرياتيل كاش": "85370602",
+      "USDT BEP20": "0x172ae5bCaEcbFe258b70b41EC372bB2f8E04C761"
+    };
+    s.address = addresses[text] || process.env[envNames[text]] || "";
     s.step = "deposit_amount";
     return ctx.reply(
       `طريقة الشحن: ${s.method}\nعنوان الاستلام:\n${s.address || "لم يضف المشرف العنوان بعد"}\n\nأرسل المبلغ الآن:`
