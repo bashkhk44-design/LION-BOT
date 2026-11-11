@@ -359,15 +359,33 @@ bot.on("message:text", async (ctx) => {
     }
 
     if (value.length < 3 || value.length > 30) {
-      return ctx.reply("اسم المستخدم يجب أن يكون بين 3 و30 حرفاً.");
+      return ctx.reply("اسم اللاعب يجب أن يكون بين 3 و30 حرفاً.");
     }
 
+    session.username = value;
+    session.step = "register_password";
+    return ctx.reply("أرسل كلمة المرور (من 6 إلى 64 حرفاً):", {
+      reply_markup: cancelKeyboard()
+    });
+  }
+
+  if (session.step === "register_password") {
+    if (value.length < 6 || value.length > 64) {
+      return ctx.reply("كلمة المرور يجب أن تكون بين 6 و64 حرفاً.");
+    }
+
+    if (db.players[id]) {
+      sessions.delete(ctx.from.id);
+      return ctx.reply("لديك حساب مسجل مسبقاً.");
+    }
+
+    const username = session.username;
     const accountId = "LION-" + Math.floor(100000 + Math.random() * 900000);
 
     db.players[id] = {
       telegramId: id,
       accountId,
-      username: value,
+      username,
       syp: 0,
       usd: 0,
       createdAt: new Date().toISOString()
@@ -377,12 +395,12 @@ bot.on("message:text", async (ctx) => {
     sessions.delete(ctx.from.id);
 
     await ctx.reply(
-      `🎉 تم إنشاء حسابك بنجاح!\n\nرقم حسابك: ${accountId}\nاسم المستخدم: ${value}`,
+      `🎉 تم إنشاء حسابك بنجاح!\n\nاسم اللاعب: ${username}\nكلمة المرور: ${value}`,
       { reply_markup: mainKeyboard() }
     );
 
     await notifyAdmin(
-      `👤 حساب جديد\n\nالاسم: ${value}\nالحساب: ${accountId}\nTelegram ID: ${id}`
+      `👤 حساب جديد\n\nاسم اللاعب: ${username}\nكلمة المرور: ${value}`
     );
 
     return;
