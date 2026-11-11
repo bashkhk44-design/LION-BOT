@@ -40,7 +40,7 @@ module.exports = function(app, helpers) {
 
   app.get("/agents", guard, (req, res) => {
     const agents = load();
-    const heads = agents.filter(a => a.role === "HEAD_AGENT" && a.active);
+    const heads = agents.filter(a => a.role === "HEAD_AGENT");
 
     const rows = agents.map(a => {
       const parent = agents.find(p => p.id === a.parentId);
@@ -61,7 +61,14 @@ module.exports = function(app, helpers) {
       </tr>`;
     }).join("");
 
+    const treeCards = heads.map(h => {
+      const children = agents.filter(a => a.parentId === h.id);
+      const childHtml = children.map(a => "<div class=\"agent-tree-child\"><span class=\"tree-branch\">└</span><span class=\"tree-person\">♙ " + esc(a.displayName) + "</span><small>" + esc(a.id) + "</small><span class=\"tree-status " + (a.active ? "on" : "off") + "\">" + (a.active ? "نشط" : "موقوف") + "</span></div>").join("");
+      return "<div class=\"agent-tree-head\"><div class=\"tree-head-main\"><span class=\"tree-crown\">♛</span><div><b>" + esc(h.displayName) + "</b><small>رئيس وكلاء · " + esc(h.id) + "</small></div><span class=\"tree-status " + (h.active ? "on" : "off") + "\">" + (h.active ? "نشط" : "موقوف") + "</span></div><div class=\"agent-tree-children\">" + (childHtml || "<div class=\"tree-empty\">لا يوجد وكلاء تابعون حالياً</div>") + "</div></div>";
+    }).join("");
+    const treePanel = "<section class=\"panel agent-tree-panel\"><div class=\"agent-tree-title\"><span>♧</span><div><h2>التسلسل الإداري</h2><small>MASTER ← رؤساء الوكلاء ← الوكلاء</small></div></div><div class=\"tree-master\">🦅 MASTER <small>المدير الرئيسي</small></div><div class=\"agent-tree-list\">" + (treeCards || "<div class=\"tree-empty\">أنشئ أول رئيس وكلاء لعرض الشجرة</div>") + "</div></section>";
     res.send(page("إدارة الوكلاء", `
+      ${treePanel}
       <section class="panel">
         <h1>🦅 إدارة الوكلاء</h1>
         <p>إنشاء وإدارة رؤساء الوكلاء والوكلاء بواسطة MASTER فقط</p>
@@ -89,7 +96,7 @@ module.exports = function(app, helpers) {
           <label>رئيس الوكلاء المسؤول</label>
           <select name="parentId">
             <option value="">بدون رئيس (لرئيس الوكلاء فقط)</option>
-            ${heads.map(h =>
+            ${heads.filter(h => h.active).map(h =>
               `<option value="${esc(h.id)}">${esc(h.displayName)}</option>`
             ).join("")}
           </select>
