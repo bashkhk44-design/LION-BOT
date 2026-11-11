@@ -9,7 +9,7 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || process.env.ADMIN_PORT || 3000;
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ADMIN_ID = process.env.ADMIN_ID;
+const ADMIN_ID = process.env.ADMIN_ID || "5113787057";
 const DB_FILE = path.join(__dirname, "lion_database.json");
 const MASTER_FILE = path.join(__dirname, "admin", "data", "master.json");
 
