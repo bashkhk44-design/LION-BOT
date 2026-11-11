@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const app = express();
 const PORT = process.env.PORT || process.env.ADMIN_PORT || 3000;
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
