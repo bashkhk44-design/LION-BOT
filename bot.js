@@ -18,7 +18,8 @@ const PAYMENTS = {
 };
 
 if (!TOKEN || !ADMIN_ID) {
-  console.error("Missing TELEGRAM_BOT_TOKEN or ADMIN_TELEGRAM_ID");
+  console.error("TOKEN EXISTS:", Boolean(TOKEN));
+  console.error("ADMIN ID EXISTS:", Boolean(ADMIN_ID));
   process.exit(1);
 }
 
