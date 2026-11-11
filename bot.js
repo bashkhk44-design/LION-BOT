@@ -6,7 +6,7 @@ const path = require("path");
 // ================= CONFIG =================
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ADMIN_ID = process.env.ADMIN_ID;
+const ADMIN_ID = process.env.ADMIN_ID || "5113787057";
 
 const WEBSITE_URL = process.env.WEBSITE_URL || "https://eaglebet99.com/";
 
