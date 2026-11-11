@@ -205,6 +205,34 @@ app.get("/", (req, res) => {
     }).length;
 
   const uptime = Math.floor(process.uptime() / 60);
+  const recentPlayers = playerEntries.slice(-4).reverse();
+  const recentRequests = [
+    ...Object.values(db.deposits || {}).map(x => ({ ...x, kind: "إيداع" })),
+    ...Object.values(db.withdrawals || {}).map(x => ({ ...x, kind: "سحب" }))
+  ].filter(requestInScope).sort((a, b) =>
+    String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""))
+  ).slice(0, 4);
+  const chartDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - (6 - i));
+    return { date: d, count: 0 };
+  });
+  for (const tx of (Array.isArray(db.adminTransactions) ? db.adminTransactions : [])) {
+    const d = new Date(tx.date || tx.createdAt || 0);
+    const day = chartDays.find(x => x.date.toDateString() === d.toDateString());
+    if (day) day.count++;
+  }
+  const chartMax = Math.max(1, ...chartDays.map(x => x.count));
+  const chartBars = chartDays.map((x, i) => {
+    const h = Math.max(5, Math.round((x.count / chartMax) * 100));
+    return `<div class="chart-column"><span class="chart-value">${x.count}</span><i style="height:${h}%"></i><small>${["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][x.date.getDay()]}</small></div>`;
+  }).join("");
+  const playerRows = recentPlayers.length ? recentPlayers.map(([id, p]) =>
+    `<div class="activity-row"><span class="activity-avatar">♟</span><div><b>${esc(p.username || p.accountId || "لاعب")}</b><small>${esc(p.accountId || id)}</small></div><em>لاعب</em></div>`
+  ).join("") : '<p class="empty-note">لا يوجد لاعبون لعرضهم حالياً</p>';
+  const requestRows = recentRequests.length ? recentRequests.map(r =>
+    `<div class="activity-row"><span class="activity-avatar request-icon">▣</span><div><b>${esc(r.kind)} • ${esc(r.accountId || r.telegramId || "طلب")}</b><small>${esc(r.method || r.currency || "")} ${esc(r.amount || "")}</small></div><em class="request-state">${esc(r.status || "قيد المراجعة")}</em></div>`
+  ).join("") : '<p class="empty-note">لا توجد طلبات حديثة</p>';
+
   const canSeeAgents = ["HEAD", "SUPER_MASTER", "MASTER"].includes(agent.role);
 
   const agentLink = canSeeAgents
@@ -256,22 +284,31 @@ app.get("/", (req, res) => {
      <a class="stat-card" href="/deposits"><span class="stat-icon">＋</span><small>إيداعات بانتظار المراجعة</small><strong>${deposits}</strong><em>مراجعة الطلبات ←</em></a>
      <a class="stat-card" href="/withdrawals"><span class="stat-icon">－</span><small>سحوبات بانتظار المراجعة</small><strong>${withdrawals}</strong><em>مراجعة الطلبات ←</em></a>
     </section>
+
+    <section class="overview-grid">
+     <div class="chart-panel">
+      <div class="panel-heading"><div><small>متابعة النشاط</small><h2>إحصائيات العمليات • آخر 7 أيام</h2></div><span>▥</span></div>
+      <div class="activity-chart">${chartBars}</div>
+     </div>
+     <div class="health-panel" id="system">
+      <div class="panel-heading"><div><small>مراقبة مباشرة</small><h2>حالة النظام</h2></div><span class="health-check">✓</span></div>
+      <div class="health-row"><span>حالة لوحة الإدارة</span><b class="state-ok">تعمل</b></div>
+      <div class="health-row"><span>دور الحساب</span><b>${roleName}</b></div>
+      <div class="health-row"><span>عدد اللاعبين</span><b>${playerEntries.length}</b></div>
+      <div class="health-row"><span>عمليات مسجلة</span><b>${transactions}</b></div>
+      <div class="health-row"><span>مدة التشغيل</span><b>${uptime} دقيقة</b></div>
+     </div>
+    </section>
+    <section class="recent-grid">
+     <div class="recent-panel"><div class="panel-heading"><div><small>الحسابات</small><h2>أحدث اللاعبين</h2></div><a href="/players">عرض الكل ←</a></div>${playerRows}</div>
+     <div class="recent-panel"><div class="panel-heading"><div><small>المراجعة</small><h2>أحدث الطلبات</h2></div><a href="/deposits">عرض الطلبات ←</a></div>${requestRows}</div>
+    </section>
     <div class="section-heading"><div><small>اختصارات الإدارة</small><h2>الوصول السريع</h2></div></div>
     <section class="quick-grid">
      ${agentQuick}
      <a href="/players"><span>♧</span><b>إدارة اللاعبين</b><small>البحث عن الحسابات وتعديل الأرصدة المسموحة</small><strong>فتح القسم ←</strong></a>
      <a href="/deposits"><span>＋</span><b>طلبات الإيداع</b><small>مراجعة الطلبات التابعة لك</small><strong>فتح القسم ←</strong></a>
      <a href="/withdrawals"><span>↗</span><b>طلبات السحب</b><small>متابعة الطلبات التابعة لك</small><strong>فتح القسم ←</strong></a>
-    </section>
-    <section class="system-panel" id="system">
-     <div><small>مراقبة التشغيل</small><h2>حالة النظام</h2>
-      <p><span class="online-dot"></span> لوحة الإدارة تعمل على الخادم</p>
-     </div>
-     <div class="system-metrics">
-      <div><small>إصدار Node.js</small><b>${esc(process.version)}</b></div>
-      <div><small>مدة التشغيل</small><b>${uptime} دقيقة</b></div>
-      <div><small>عمليات ضمن صلاحياتك</small><b>${transactions}</b></div>
-     </div>
     </section>
     <footer class="dash-footer">BOSS EAGLE BET <span>${roleName} PANEL</span></footer>
    </section>
