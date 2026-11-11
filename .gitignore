@@ -11,3 +11,6 @@ backups/
 *.backup
 *.backup*
 *.before_*
+
+admin/data/master.json
+admin/data/master.json.*
