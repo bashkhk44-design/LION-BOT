@@ -92,6 +92,8 @@ async function sendSetupCode() {
   setupCodeExpires = Date.now() + 5 * 60 * 1000;
 }
 
+app.get("/admin", (req, res) => res.redirect("/"));
+
 app.get("/", (req, res) => {
   let hash;
   try { hash = readMaster(); } catch { return res.status(500).send("ملف إعداد المدير تالف. راجع ملفات السيرفر."); }
@@ -130,17 +132,54 @@ app.get("/", (req, res) => {
   const deposits = Object.values(db.deposits || {}).filter(x => x.status === "pending").length;
   const withdrawals = Object.values(db.withdrawals || {}).filter(x => x.status === "pending").length;
 
+  let agentCount = 0;
+  try {
+    const agentFile = path.join(__dirname, "admin", "data", "agents.json");
+    if (fs.existsSync(agentFile)) {
+      const agentData = JSON.parse(fs.readFileSync(agentFile, "utf8"));
+      agentCount = Array.isArray(agentData.agents) ? agentData.agents.filter(a => a.active).length : 0;
+    }
+  } catch (e) { console.error("Agent summary error:", e.message); }
+  const transactions = Array.isArray(db.adminTransactions) ? db.adminTransactions.length : 0;
+  const uptime = Math.floor(process.uptime() / 60);
   res.send(page("لوحة MASTER", `
-<header class="top"><div><h1>🦅 BOSS EAGLE BET</h1><p>لوحة المدير الرئيسي</p></div>
-<form method="POST" action="/logout"><input type="hidden" name="csrf" value="${csrf(req)}"><button class="secondary">خروج</button></form></header>
-<section class="grid">
-<a class="panel nav-card" href="/players"><small>👥 الحسابات المسجلة</small><strong>${players}</strong></a>
-<a class="panel nav-card" href="/deposits"><small>💰 طلبات الإيداع المعلقة</small><strong>${deposits}</strong></a>
-<a class="panel nav-card" href="/withdrawals"><small>💸 طلبات السحب المعلقة</small><strong>${withdrawals}</strong></a></section>
-<section class="panel"><h2>🦅 إدارة النظام</h2><nav class="admin-menu">
-<a href="/agents">👥 إدارة الوكلاء</a><a href="/players">👤 إدارة اللاعبين</a>
-<a href="/deposits">💰 طلبات الإيداع</a><a href="/withdrawals">💸 طلبات السحب</a>
-</nav></section>`));
+<div class="dashboard-shell">
+ <aside class="sidebar">
+  <div class="side-brand"><div class="eagle-mark">🦅</div><div><b>BOSS EAGLE</b><small>MASTER CONTROL</small></div></div>
+  <div class="side-caption">القائمة الرئيسية</div>
+  <a class="side-link active" href="/"><span>▦</span> لوحة التحكم</a>
+  <a class="side-link" href="/agents"><span>♙</span> الوكلاء ورؤساء الوكلاء</a>
+  <a class="side-link" href="/players"><span>♧</span> حسابات اللاعبين</a>
+  <a class="side-link" href="/deposits"><span>＋</span> طلبات الإيداع <i>${deposits}</i></a>
+  <a class="side-link" href="/withdrawals"><span>－</span> طلبات السحب <i>${withdrawals}</i></a>
+  <div class="side-caption">النظام</div><a class="side-link" href="#system"><span>⌘</span> حالة النظام</a>
+  <div class="side-footer"><span class="online-dot"></span> MASTER متصل</div>
+ </aside>
+ <section class="dashboard-main">
+  <header class="dash-topbar"><div><small>مركز الإدارة / الرئيسية</small><h1>لوحة التحكم الرئيسية</h1></div>
+   <form method="POST" action="/logout"><input type="hidden" name="csrf" value="${csrf(req)}"><button class="secondary">تسجيل الخروج</button></form>
+  </header>
+  <section class="welcome-banner"><div><span class="eyebrow">BOSS EAGLE BET • CONTROL CENTER</span><h2>مرحباً بك، MASTER</h2><p>إدارة ومتابعة النظام من مكان واحد.</p></div><div class="banner-emblem">🦅</div></section>
+  <div class="section-heading"><div><small>نظرة عامة</small><h2>ملخص المنصة</h2></div><span class="live-label"><b></b> النظام يعمل</span></div>
+  <section class="stat-grid">
+   <a class="stat-card" href="/players"><span class="stat-icon">♙</span><small>إجمالي اللاعبين</small><strong>${players}</strong><em>عرض الحسابات ←</em></a>
+   <a class="stat-card" href="/agents"><span class="stat-icon">♧</span><small>الوكلاء النشطون</small><strong>${agentCount}</strong><em>إدارة شبكة الوكلاء ←</em></a>
+   <a class="stat-card" href="/deposits"><span class="stat-icon">＋</span><small>إيداعات بانتظار المراجعة</small><strong>${deposits}</strong><em>مراجعة الطلبات ←</em></a>
+   <a class="stat-card" href="/withdrawals"><span class="stat-icon">－</span><small>سحوبات بانتظار المراجعة</small><strong>${withdrawals}</strong><em>مراجعة الطلبات ←</em></a>
+  </section>
+  <div class="section-heading"><div><small>اختصارات الإدارة</small><h2>الوصول السريع</h2></div></div>
+  <section class="quick-grid">
+   <a href="/agents"><span>♙</span><b>إدارة الوكلاء</b><small>إنشاء رئيس وكلاء أو وكيل وربط التبعية</small><strong>فتح القسم ←</strong></a>
+   <a href="/players"><span>♧</span><b>إدارة اللاعبين</b><small>البحث عن الحسابات وتعديل الأرصدة</small><strong>فتح القسم ←</strong></a>
+   <a href="/deposits"><span>＋</span><b>طلبات الإيداع</b><small>مراجعة طلبات شحن الحسابات</small><strong>فتح القسم ←</strong></a>
+   <a href="/withdrawals"><span>↗</span><b>طلبات السحب</b><small>متابعة طلبات السحب ومعالجتها</small><strong>فتح القسم ←</strong></a>
+  </section>
+  <section class="system-panel" id="system"><div><small>مراقبة التشغيل</small><h2>حالة النظام</h2><p><span class="online-dot"></span> لوحة الإدارة تعمل على الخادم</p></div>
+   <div class="system-metrics"><div><small>إصدار Node.js</small><b>${esc(process.version)}</b></div><div><small>منفذ التطبيق</small><b>${esc(PORT)}</b></div><div><small>مدة التشغيل</small><b>${uptime} دقيقة</b></div><div><small>سجل عمليات الإدارة</small><b>${transactions}</b></div></div>
+  </section>
+  <footer class="dash-footer">BOSS EAGLE BET MASTER <span>لوحة الإدارة الرئيسية</span></footer>
+ </section>
+</div>`));
 });
 
 app.post("/send-code", async (req, res) => {
