@@ -82,7 +82,8 @@ function mainKeyboard() {
   return new Keyboard()
     .text("👤 إنشاء حساب").text("💳 شحن المحفظة").row()
     .text("💸 سحب الرصيد").text("💰 رصيدي").row()
-    .text("🌐 موقع الألعاب").text("📞 مراسلة الدعم")
+    .text("🌐 موقع الألعاب").text("📞 مراسلة الدعم").row()
+    .text("🗑️ حذف الحساب")
     .resized();
 }
 
@@ -166,6 +167,42 @@ bot.hears("👤 إنشاء حساب", async (ctx) => {
     "أرسل اسم المستخدم الذي تريد تسجيله:",
     { reply_markup: cancelKeyboard() }
   );
+});
+
+
+// DELETE ACCOUNT
+function hasPendingRequests(id) {
+  const pending = obj => Object.values(obj || {}).some(r =>
+    String(r.telegramId) === id && r.status === "pending"
+  );
+  return pending(db.deposits) || pending(db.withdrawals);
+}
+
+bot.hears("🗑️ حذف الحساب", async ctx => {
+  const id = String(ctx.from.id);
+  if (!db.players[id]) return ctx.reply("ليس لديك حساب مسجل.", { reply_markup: mainKeyboard() });
+  if (hasPendingRequests(id)) return ctx.reply("لا يمكن حذف الحساب لوجود طلب شحن أو سحب قيد المراجعة.");
+  sessions.set(ctx.from.id, { step: "delete_confirm" });
+  const kb = new Keyboard().text("✅ تأكيد حذف الحساب").row().text("❌ إلغاء الحذف").resized();
+  return ctx.reply("هل أنت متأكد من حذف حسابك؟ سيبقى سجل الطلبات محفوظاً.", { reply_markup: kb });
+});
+
+bot.hears("✅ تأكيد حذف الحساب", async ctx => {
+  const id = String(ctx.from.id);
+  if (sessions.get(ctx.from.id)?.step !== "delete_confirm") return;
+  if (hasPendingRequests(id)) {
+    sessions.delete(ctx.from.id);
+    return ctx.reply("يوجد طلب معلّق، لا يمكن حذف الحساب.", { reply_markup: mainKeyboard() });
+  }
+  delete db.players[id];
+  saveDB();
+  sessions.delete(ctx.from.id);
+  return ctx.reply("تم حذف الحساب. يمكنك التسجيل من جديد.", { reply_markup: mainKeyboard() });
+});
+
+bot.hears("❌ إلغاء الحذف", async ctx => {
+  if (sessions.get(ctx.from.id)?.step === "delete_confirm") sessions.delete(ctx.from.id);
+  return ctx.reply("تم إلغاء الحذف.", { reply_markup: mainKeyboard() });
 });
 
 // ================= BALANCE =================
