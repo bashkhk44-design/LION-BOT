@@ -42,8 +42,8 @@ module.exports = function(app, helpers) {
 
   function guard(req, res, next) {
     auth.guard(req, res, () => {
-      if (req.agent.role !== "HEAD") {
-        return res.status(403).send("إنشاء وإدارة الرتب متاحان للمدير الرئيسي فقط.");
+      if (!["HEAD", "SUPER_MASTER", "MASTER"].includes(req.agent.role)) {
+        return res.status(403).send("ليس لديك صلاحية عرض شبكة الوكلاء.");
       }
       next();
     });
