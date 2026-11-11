@@ -9,17 +9,14 @@ module.exports = function(app, helpers) {
   const { csrf, validCsrf, page } = helpers;
 
   const ROLE_NAMES = {
-    HEAD: "HEAD",
-    SUPER_MASTER: "SUPER MASTER",
-    MASTER: "MASTER",
-    CASHIER: "CASHIER"
+    HEAD: "المدير الرئيسي",
+    SUPER_MASTER: "رئيس الوكلاء",
+    MASTER: "وكيل",
+    CASHIER: "كاشيرة"
   };
 
-  const NEXT_ROLE = {
-    HEAD: "SUPER_MASTER",
-    SUPER_MASTER: "MASTER",
-    MASTER: "CASHIER"
-  };
+  // إنشاء الرتب التابعة محصور بالمدير الرئيسي HEAD.
+  const CREATABLE_ROLES = ["SUPER_MASTER", "MASTER", "CASHIER"];
 
   const BOT_USERNAME = "Lion_Games_2026_bot";
   const WEB_URL = "https://lion-games-2026-bot.fadehost.app";
@@ -45,8 +42,8 @@ module.exports = function(app, helpers) {
 
   function guard(req, res, next) {
     auth.guard(req, res, () => {
-      if (!["HEAD", "SUPER_MASTER", "MASTER"].includes(req.agent.role)) {
-        return res.status(403).send("ليس لديك صلاحية إدارة الموظفين.");
+      if (req.agent.role !== "HEAD") {
+        return res.status(403).send("إنشاء وإدارة الرتب متاحان للمدير الرئيسي فقط.");
       }
       next();
     });
@@ -63,7 +60,7 @@ module.exports = function(app, helpers) {
       const actor = req.agent;
       const agents = load();
       const visible = agents.filter(a => isInScope(actor, a, agents));
-      const childRole = NEXT_ROLE[actor.role];
+      const canCreate = actor.role === "HEAD";
 
       const rows = visible.map(a => {
         const parent = agents.find(p => p.id === a.parentId);
@@ -92,31 +89,27 @@ module.exports = function(app, helpers) {
         </tr>`;
       }).join("");
 
-      const parentOptions = visible
-        .filter(a => a.role === actor.role && a.active && actor.role !== "HEAD")
-        .map(a => `<option value="${esc(a.id)}">${esc(a.displayName)}</option>`)
-        .join("");
-
-      const form = childRole ? `
+      const form = canCreate ? `
         <section class="panel">
-          <h2>إنشاء ${esc(ROLE_NAMES[childRole])}</h2>
+          <h2>إنشاء حساب تابع</h2>
           <form method="POST" action="/agents">
             <input type="hidden" name="csrf" value="${csrf(req)}">
+            <label>نوع الحساب</label>
+            <select name="role" required>
+              <option value="">اختر الرتبة</option>
+              <option value="SUPER_MASTER">رئيس وكلاء</option>
+              <option value="MASTER">وكيل</option>
+              <option value="CASHIER">كاشيرة</option>
+            </select>
             <label>الاسم الظاهر</label>
             <input name="displayName" required minlength="2" maxlength="60">
             <label>اسم المستخدم</label>
             <input name="username" required minlength="4" maxlength="24" pattern="[A-Za-z0-9_]+">
             <label>كلمة المرور</label>
             <input type="password" name="password" required minlength="10" maxlength="100">
-            ${actor.role === "HEAD" ? "" : `
-              <label>الحساب المسؤول</label>
-              <select name="parentId" required>
-                <option value="">اختر الحساب الأب</option>
-                ${parentOptions}
-              </select>`}
             <button type="submit">إنشاء الحساب</button>
           </form>
-        </section>` : "";
+        </section>` : '<section class="panel"><p>إنشاء رؤساء الوكلاء والوكلاء والكاشيرات متاح للمدير الرئيسي فقط.</p></section>';
 
       res.send(page("إدارة الموظفين", `
         <section class="panel">
@@ -149,8 +142,13 @@ module.exports = function(app, helpers) {
 
     try {
       const actor = req.agent;
-      const role = NEXT_ROLE[actor.role];
-      if (!role) return res.status(403).send("لا يمكنك إنشاء رتبة جديدة.");
+      if (actor.role !== "HEAD") {
+        return res.status(403).send("إنشاء الحسابات متاح للمدير الرئيسي فقط.");
+      }
+      const role = String(req.body.role || "");
+      if (!CREATABLE_ROLES.includes(role)) {
+        return res.status(400).send("نوع الحساب غير صالح.");
+      }
 
       const displayName = String(req.body.displayName || "").trim();
       const username = String(req.body.username || "").trim();
@@ -169,20 +167,8 @@ module.exports = function(app, helpers) {
         return res.status(409).send("اسم المستخدم مستخدم مسبقاً.");
       }
 
-      let parent = null;
-      if (actor.role !== "HEAD") {
-        parent = agents.find(a =>
-          a.id === parentId &&
-          a.role === actor.role &&
-          a.active === true &&
-          auth.descendants(actor, agents).some(x => x.id === a.id)
-        );
-        if (!parent) return res.status(400).send("الحساب المسؤول غير صالح.");
-      }
-
-      if (actor.role === "HEAD" && agents.some(a => a.role === "HEAD" && a.active)) {
-        // لا ننشئ HEAD آخر
-      }
+      // كل الحسابات الجديدة تتبع المدير الرئيسي مباشرة؛ لا يستطيع أي رئيس وكلاء
+      // أو وكيل إنشاء رتب أو حسابات أخرى.
 
       const id = "AG-" + crypto.randomBytes(8).toString("hex").toUpperCase();
       const newAgent = {
@@ -191,7 +177,7 @@ module.exports = function(app, helpers) {
         username,
         passwordHash: await bcrypt.hash(password, 12),
         role,
-        parentId: actor.role === "HEAD" ? (actor.id || agents.find(a => a.role === "HEAD" && a.active)?.id) : parent.id,
+        parentId: actor.id || agents.find(a => a.role === "HEAD" && a.active)?.id || null,
         active: true,
         createdAt: new Date().toISOString()
       };
