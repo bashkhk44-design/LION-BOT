@@ -2,3 +2,12 @@ node_modules/
 .env
 .env.*
 *.log
+lion_database.json
+lion_database.backup.json
+admin/data/agents.json
+admin/data/agents.json.*
+agents-recovery.json
+backups/
+*.backup
+*.backup*
+*.before_*
