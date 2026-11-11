@@ -5,8 +5,15 @@ const FILE = path.join(__dirname, "data", "agents.json");
 const LEVELS = ["HEAD", "SUPER_MASTER", "MASTER", "CASHIER"];
 
 function loadAgents() {
-  // Fresh deployments may not have an employee database yet.
-  if (!fs.existsSync(FILE)) return [];
+  // Create the employee database on fresh deployments, without overwriting existing data.
+  fs.mkdirSync(path.dirname(FILE), { recursive: true });
+  if (!fs.existsSync(FILE)) {
+    try {
+      fs.writeFileSync(FILE, JSON.stringify({ agents: [] }, null, 2), { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+  }
   const data = JSON.parse(fs.readFileSync(FILE, "utf8"));
   return Array.isArray(data.agents) ? data.agents : [];
 }
