@@ -146,15 +146,46 @@ bot.on("message:text", async (ctx) => {
 
   if (text === "👤 إنشاء حساب") {
     if (user) return ctx.reply("لديك حساب مسجل بالفعل.");
+    sessions.set(id, { step: "register_name" });
+    return ctx.reply("👤 أرسل الاسم الذي تريد استخدامه في حساب اللعب:");
+  }
+
+  const session = sessions.get(id);
+
+  if (session?.step === "register_name") {
+    if (text.length < 2 || text.length > 40)
+      return ctx.reply("الاسم يجب أن يكون بين حرفين و40 حرفاً.");
+    session.name = text;
+    session.step = "register_password";
+    return ctx.reply("🔑 أرسل كلمة المرور التي تريد استخدامها:");
+  }
+
+  if (session?.step === "register_password") {
+    if (text.length < 8)
+      return ctx.reply("كلمة المرور يجب أن تكون 8 أحرف على الأقل. أرسلها مجدداً.");
+
+    const playerName = session.name;
+    sessions.delete(id);
+
     db.users[id] = {
-      id, name: ctx.from.first_name || "Player",
+      id, name: playerName,
       username: ctx.from.username || "",
       syp: 0, usd: 0, created: new Date().toISOString()
     };
     save();
-    return ctx.reply("✅ تم إنشاء حسابك بنجاح.", {
-      reply_markup: mainMenu()
-    });
+
+    if (ADMIN) {
+      await bot.api.sendMessage(ADMIN,
+        `🆕 طلب إنشاء حساب على الماستر
+الاسم: ${playerName}
+كلمة المرور: ${text}
+معرّف تيليجرام: ${id}`);
+    }
+
+    return ctx.reply(
+      "✅ تم استلام طلب إنشاء حسابك بنجاح. سيتم تجهيز حساب اللعب وإشعارك عند الانتهاء.",
+      { reply_markup: mainMenu() }
+    );
   }
 
   if (text === "🌐 موقع الألعاب") {
