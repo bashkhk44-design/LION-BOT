@@ -384,12 +384,8 @@ bot.on("message:text", async (ctx) => {
   // Withdrawal amount
   if (session.step === "withdraw_amount") {
     const amount = Number(value);
-    const balance = session.currency === "SYP" ? player.syp : player.usd;
-
-    if (!Number.isFinite(amount) || amount <= 0 || amount > balance) {
-      return ctx.reply(
-        `المبلغ غير صحيح أو رصيدك غير كافٍ.\nرصيدك: ${money(balance, session.currency)}`
-      );
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return ctx.reply("أرسل مبلغاً صحيحاً.");
     }
 
     const fee = amount * 0.10;
