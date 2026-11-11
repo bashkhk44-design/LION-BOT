@@ -134,13 +134,54 @@ async function notifyAdmin(text, keyboard) {
   );
 }
 
-// ================= START =================
+// ================= START & TERMS =================
+
+if (!db.acceptedTerms) db.acceptedTerms = {};
+
+const TERMS_TEXT = `🦅 أهلاً بك في BOSS EAGLE BET
+
+📜 قوانين استخدام البوت:
+
+1. يُسمح بحساب واحد لكل مستخدم.
+2. يجب إدخال بيانات صحيحة عند التسجيل.
+3. تأكد من صحة بيانات الشحن.
+4. تخضع عمليات الشحن والسحب للمراجعة.
+5. يمنع التلاعب بالأرصدة.
+6. حافظ على سرية كلمة المرور.
+
+⚠️ بالضغط على موافق، أنت تقر بقبول القوانين.
+
+🦅 BOSS EAGLE BET`;
 
 bot.command("start", async (ctx) => {
   sessions.delete(ctx.from.id);
+  const id = String(ctx.from.id);
+
+  if (db.acceptedTerms[id]) {
+    return ctx.reply(
+      "🦅 أهلاً بعودتك إلى BOSS EAGLE BET",
+      { reply_markup: mainKeyboard() }
+    );
+  }
+
+  const keyboard = new InlineKeyboard()
+    .text("✅ موافق، أتابع", "accept_terms");
+
+  await ctx.reply(TERMS_TEXT, { reply_markup: keyboard });
+});
+
+bot.callbackQuery("accept_terms", async (ctx) => {
+  const id = String(ctx.from.id);
+
+  db.acceptedTerms[id] = true;
+  saveDB();
+
+  await ctx.answerCallbackQuery({
+    text: "تم قبول قوانين الاستخدام"
+  });
 
   await ctx.reply(
-    "🦁 أهلاً بك في LION GAMES\n\nمرحباً بك في نظام الحسابات والمحافظ.\nاختر الخدمة التي تريدها من القائمة:",
+    "🦅 تم قبول القوانين بنجاح. أهلاً بك في BOSS EAGLE BET!",
     { reply_markup: mainKeyboard() }
   );
 });
