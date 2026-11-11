@@ -208,3 +208,25 @@ td input, td select { min-width: 115px; }
 .dash-footer{display:flex;justify-content:space-between;gap:10px;margin-top:22px;padding:13px 2px;border-top:1px solid #5c4822;color:#c8a65b;font-size:10px;letter-spacing:1px}.dash-footer span{color:#766b54;letter-spacing:0}
 @media(max-width:900px){.dashboard-shell{grid-template-columns:190px minmax(0,1fr);gap:13px}.sidebar{padding:15px 9px}.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.system-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.dashboard-shell{display:block}.sidebar{position:static;min-height:0;margin-bottom:14px;padding:10px}.side-brand{padding:5px 5px 10px}.side-caption{display:none}.sidebar .side-link{display:inline-flex;width:calc(50% - 5px);margin:3px 1px;padding:9px 7px;font-size:11px}.side-footer{margin:8px 5px 0;padding:8px}.dash-topbar h1{font-size:20px}.welcome-banner{min-height:125px;padding:18px}.welcome-banner h2{font-size:21px}.banner-emblem{font-size:48px}.quick-grid{grid-template-columns:1fr}.stat-card{padding:13px}.stat-card strong{font-size:26px}.system-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Agent hierarchy page */
+.agent-tree-panel{border-color:#9a762f;background:linear-gradient(145deg,#1c180f,#0d0d0c)}
+.agent-tree-title{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.agent-tree-title>span{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#3a2b12;color:#ffe39a;font-size:23px}
+.agent-tree-title h2{margin:0 0 3px}.agent-tree-title small{font-size:11px;color:#9f916e}
+.tree-master{display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;padding:12px 18px;margin:0 auto 17px;border:1px solid #d5ae57;border-radius:12px;background:linear-gradient(120deg,#493719,#171208);color:#ffe39a;font-weight:800;box-shadow:0 0 24px #c18d2b20}
+.tree-master small{font-size:10px;color:#c7b98f;font-weight:400}
+.agent-tree-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.agent-tree-head{min-width:0;padding:13px;border:1px solid #72551f;border-radius:12px;background:#11100d}
+.tree-head-main{display:flex;align-items:center;gap:9px;min-width:0}
+.tree-crown{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:10px;background:#3a2b12;color:#ffe39a;font-size:19px}
+.tree-head-main>div{min-width:0;flex:1}.tree-head-main b,.tree-head-main small{display:block;overflow-wrap:anywhere}
+.tree-head-main b{color:#f7e6bd;font-size:13px}.tree-head-main small{color:#9e916f;font-size:9px}
+.agent-tree-children{margin:12px 0 0 17px;padding:4px 12px 2px 0;border-right:1px solid #88672b}
+.agent-tree-child{display:flex;align-items:center;gap:7px;min-width:0;padding:8px 0;border-bottom:1px solid #ffffff0c}
+.agent-tree-child:last-child{border-bottom:0}.tree-branch{color:#c6a04e}.tree-person{color:#e8d9b5;font-size:11px;min-width:0;overflow-wrap:anywhere}.agent-tree-child small{color:#82765c;font-size:9px;margin-right:auto}
+.tree-status{display:inline-block;white-space:nowrap;padding:3px 8px;border-radius:20px;font-size:9px}
+.tree-status.on{color:#79e3ad;background:#143322}.tree-status.off{color:#f2a1a1;background:#3b1919}
+.tree-empty{padding:12px;text-align:center;color:#8f846a;font-size:11px}
+@media(max-width:650px){.agent-tree-list{grid-template-columns:1fr}.tree-master{margin-bottom:12px}.agent-tree-head{padding:11px}}
