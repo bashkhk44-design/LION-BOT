@@ -103,6 +103,28 @@ async function sendSetupCode() {
   setupCodeExpires = Date.now() + 5 * 60 * 1000;
 }
 
+// Direct setup-code page: useful when the root page is cached by a browser or proxy.
+app.get("/request-code", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  let hash;
+  try {
+    hash = readMaster();
+  } catch {
+    return res.status(500).send("ملف إعداد المدير تالف. راجع ملفات السيرفر.");
+  }
+  if (hash) return res.redirect("/");
+  return res.send(page("طلب رمز HEAD", `
+    <section class="panel login">
+      <h1>🦅 BOSS EAGLE BET</h1>
+      <p>إرسال رمز التحقق إلى Telegram الخاص بالمدير الرئيسي</p>
+      <form method="POST" action="/send-code">
+        <input type="hidden" name="csrf" value="${csrf(req)}">
+        <button type="submit">إرسال رمز التحقق إلى Telegram</button>
+      </form>
+      <p><a href="/">العودة إلى صفحة إعداد HEAD</a></p>
+    </section>`));
+});
+
 app.get("/admin", (req, res) => res.redirect("/"));
 
 app.get("/", (req, res) => {
