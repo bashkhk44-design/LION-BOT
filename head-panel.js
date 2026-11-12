@@ -16,7 +16,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.urlencoded({ extended: false, limit: "20kb" }));
 app.use(session({
   name: "lion_head_session",
-  secret: process.env.HEAD_SESSION_SECRET || process.env.SESSION_SECRET || "temporary-secret-change-this",
+  secret: crypto.createHash("sha256").update(String(process.env.HEAD_PASSWORD || "missing-head-password")).digest("hex"),
   resave: false,
   saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: "strict", secure: "auto", maxAge: 8 *  60 * 60 * 1000 }
@@ -41,8 +41,8 @@ function validCsrf(req) {
  return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
 }
 function configured(req, res, next) {
- if (!process.env.HEAD_USERNAME || !process.env.HEAD_PASSWORD || !(process.env.HEAD_SESSION_SECRET || process.env.SESSION_SECRET)) {
-  return res.status(503).send(page("إعداد مطلوب", '<main class="wrap"><div class="section"><h2>إعداد لوحة HEAD مطلوب</h2><p>أضف المتغيرات HEAD_USERNAME وHEAD_PASSWORD وHEAD_SESSION_SECRET في إعدادات FadeHost ثم أعد التشغيل.</p></div></main>'));
+ if (!process.env.HEAD_USERNAME || !process.env.HEAD_PASSWORD) {
+  return res.status(503).send(page("إعداد مطلوب", '<main class="wrap"><div class="section"><h2>إعداد لوحة HEAD مطلوب</h2><p>أضف المتغيرين HEAD_USERNAME وHEAD_PASSWORD في إعدادات FadeHost ثم أعد التشغيل.</p></div></main>'));
  }
  next();
 }
