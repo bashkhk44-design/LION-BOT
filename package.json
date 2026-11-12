@@ -5,7 +5,8 @@
   "main": "bot.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node start.js"
+    "start": "node start.js",
+    "head": "node head-panel/server.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
